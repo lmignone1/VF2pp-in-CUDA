@@ -7,12 +7,12 @@
 
 typedef struct Node {
     int vertex;
-    int label;  // forse non serve
     struct Node* next;
 } Node;
 
 typedef struct AdjList {
     Node* head;
+    int label;
 } AdjList;
 
 typedef struct Graph {
@@ -20,7 +20,7 @@ typedef struct Graph {
     AdjList* nodesList;
 } Graph;
 
-Node* createNode(int, int);
+Node* createNode(int);
 Graph* createGraph(int);
 void addEdge(Graph*, int, int, int, int);
 void printGraph(Graph*);

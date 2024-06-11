@@ -1,9 +1,8 @@
 #include "graph.h"
 
-Node* createNode(int vertex, int label) {
+Node* createNode(int vertex) {
     Node* node = (Node*)malloc(sizeof(Node));
     node->vertex = vertex;
-    node->label = label;
     node->next = NULL;
     return node;
 }
@@ -21,22 +20,24 @@ Graph* createGraph(int numVertices) {
 }
 
 void addEdge(Graph* graph, int src, int target, int srcLabel, int targetLabel) {
-    Node* node = createNode(target, targetLabel);
+    Node* node = createNode(target);
     node->next = graph->nodesList[src].head;
     graph->nodesList[src].head = node;
+    graph->nodesList[src].label = srcLabel;
     
-    node = createNode(src, srcLabel);
+    node = createNode(src);
     node->next = graph->nodesList[target].head;
     graph->nodesList[target].head = node;
+    graph->nodesList[target].label = targetLabel;
 }
 
 void printGraph(Graph* graph) {
     for (int v = 0; v < graph->numVertices; ++v) {
-        Node* currentNode = graph->nodesList[v].head;
-        printf("\n // Adjency list of vertex %d\n head", v);
-        while (currentNode) {
-            printf(" -> %d", currentNode->vertex);
-            currentNode = currentNode->next;
+        Node* adjNode = graph->nodesList[v].head;
+        printf("\n // Adjency list of vertex %d with label %d\n head", v, graph->nodesList[v].label);
+        while (adjNode) {
+            printf(" -> %d", adjNode->vertex);
+            adjNode = adjNode->next;
         }
         printf("\n");
     }
