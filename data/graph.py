@@ -6,6 +6,7 @@ import os
 FILENAME1 = "graph_query.csv"
 FILENAME2 = "graph_target.csv"
 LABELS = 10
+NODES = 550
 
 # Function to save graph to CSV
 def save_graph_to_csv(graph, filename):
@@ -20,8 +21,8 @@ def save_graph_to_csv(graph, filename):
             writer.writerow([u, v, l1, l2])
 
 # Graph initialization
-g1 = nx.gnp_random_graph(550, 0.55, 42)
-g2 = nx.gnp_random_graph(550, 0.55, 42)
+g1 = nx.gnp_random_graph(NODES, 0.55, 42)
+g2 = nx.gnp_random_graph(NODES, 0.55, 42)
 
 for node in g1.nodes():
     label = random.randint(0, LABELS - 1)
