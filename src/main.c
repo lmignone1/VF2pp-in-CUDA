@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define FILENAME_QUERY "../data/graph_query_example.csv"
-#define FILENAME_TARGET "../data/graph_target_example.csv"
+#define FILENAME_QUERY "../data/graph_query.csv"
+#define FILENAME_TARGET "../data/graph_target.csv"
 #define LABELS 10
 
 typedef struct {
@@ -42,19 +42,24 @@ void printState(State*, int);
 
 /***** VF2++ PROTOTYPES *****/
 void vf2pp(Graph*, Graph*, State*);
+bool checkProperties(Graph*, Graph*);
+bool checkSequenceDegree(int*, int*, int);
+int compare(const void*, const void*);
+
+
 
 int main() {
 
     Graph* g1 = readGraph(FILENAME_QUERY);
     Graph* g2 = readGraph(FILENAME_TARGET);
     State* s = createState(g1, g2);
+    vf2pp(g1, g2, s);
+    // printState(s, g1->numVertices);
     
-    printState(s, g1->numVertices);
-    
-    printf("Graph query:\n");
-    printGraph(g1);
-    printf("\nGraph target:\n");
-    printGraph(g2);
+    // printf("Graph query:\n");
+    // printGraph(g1);
+    // printf("\nGraph target:\n");
+    // printGraph(g2);
 
     freeGraph(g1);
     freeGraph(g2);
@@ -63,6 +68,8 @@ int main() {
     printf("fine");
     return 0;
 }
+
+
 
 /***** GRAPH FUNCTIONS *****/
 
@@ -147,9 +154,7 @@ Graph* readGraph(char* path) {
     g->matrix = createAdjMatrix(g->numVertices);
     initLabels(g);
 
-
     while (fgets(line, sizeof(line), f)) {
-        printf("%s", line);
         sscanf(line, "%d,%d,%d,%d", &src, &target, &srcLabel, &targetLabel);
         addEdge(g, src, target);
         setLabel(g, src, srcLabel);
@@ -157,9 +162,7 @@ Graph* readGraph(char* path) {
     }
     
     fclose(f);
-    
     g->degrees = degrees(g);
-
     return g;
 }
 
@@ -276,3 +279,76 @@ void printState(State* s, int numVertices) {
 }
 
 /***** VF2++ FUNCTIONS *****/
+bool checkProperties(Graph* g1, Graph* g2) {
+    if (g1->numVertices != g2->numVertices || g1->numVertices == 0 || g2->numVertices == 0) {
+        return false;
+    }
+
+    if (!checkSequenceDegree(g1->degrees, g2->degrees, g1->numVertices)) {
+        return false;
+    }
+
+    for(int i = 0; i < LABELS; i++) {
+        if (g1->labelsCardinalities[i] != g2->labelsCardinalities[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool checkSequenceDegree(int* g1, int* g2, int size) {
+    int* tmp1 = (int*)malloc(size * sizeof(int));
+    int* tmp2 = (int*)malloc(size * sizeof(int));
+
+    if (tmp1 == NULL || tmp2 == NULL) {
+        printf("Error allocating memory in checkSequenceDegree\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < size; i++) {
+        tmp1[i] = g1[i];
+        tmp2[i] = g2[i];
+    }
+
+    qsort(tmp1, size, sizeof(int), compare);
+    qsort(tmp2, size, sizeof(int), compare);
+   
+    bool ret = true;
+    for (int i = 0; i < size; i++) {
+        if (tmp1[i] != tmp2[i]) {
+            ret = false;
+            break;
+        }
+    }
+
+    free(tmp1);
+    free(tmp2);
+    return ret;
+}
+
+int compare(const void* a, const void* b) {
+    return (*(int*)a - *(int*)b);
+}
+
+int* ordering(Graph* g1, Graph* g2, State* state) {
+    int* order = (int*)malloc(g1->numVertices * sizeof(int));
+
+    if (ordering == NULL) {
+        printf("Error allocating memory in ordering\n");
+        exit(EXIT_FAILURE);
+    }
+
+    
+
+    return order;
+}
+
+void vf2pp(Graph* g1, Graph* g2, State* state) {
+    if (!checkProperties(g1, g2)) {
+        printf("Graphs are not isomorphic\n");
+        return;
+    }
+
+    printf("Graphs are isomorphic\n");
+}
