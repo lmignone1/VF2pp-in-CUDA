@@ -1,5 +1,5 @@
-#ifndef GRAPH_H
-#define GRAPH_H
+#ifndef GRAPH_LIST_H
+#define GRAPH_LIST_H
 
 #include <stdio.h>
 #include <stdlib.h>

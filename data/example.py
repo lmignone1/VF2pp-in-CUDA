@@ -1,4 +1,3 @@
-import random
 import networkx as nx
 import csv, os
 
@@ -8,7 +7,7 @@ FILENAME2 = "graph_target_example.csv"
 def save_graph_to_csv(graph : nx, filename):
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Number of vertices " + str(graph.number_of_nodes())])  # Header
+        writer.writerow(["Number of vertices " + str(graph.number_of_nodes())])
         writer.writerow(['u', 'v', 'l1', 'l2'])  # Header
         for edge in graph.edges():
             u, v = edge
