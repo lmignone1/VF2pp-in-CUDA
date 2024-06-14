@@ -5,7 +5,9 @@
 #define FILENAME_QUERY "../data/graph_query.csv"
 #define FILENAME_TARGET "../data/graph_target.csv"
 #define LABELS 10
+#define INF 99999
 
+/***** STRUCTS *****/
 typedef struct {
     int* matrix;
     int numVertices;
@@ -22,6 +24,13 @@ typedef struct {
     int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti
     int* T2_out;
 } State;
+
+typedef struct {
+    int* data;
+    int head;
+    int tail;
+    int capacity;
+} Queue;
 
 /***** GRAPH PROTOTYPES *****/
 int* createAdjMatrix(int);
@@ -42,11 +51,22 @@ void printState(State*, int);
 
 /***** VF2++ PROTOTYPES *****/
 void vf2pp(Graph*, Graph*, State*);
-bool checkProperties(Graph*, Graph*);
+bool checkGraphProperties(Graph*, Graph*);
 bool checkSequenceDegree(int*, int*, int);
 int compare(const void*, const void*);
+int* ordering(Graph*, Graph*);
+int* copyArray(int*, int);
+int* bfs(Graph*, int, int*);
+int findLevelNodes(Graph*, int*, int*, int);
+void removeElementArray(int*, int*, int);
 
-
+/***** Queue FUNCTIONS *****/
+Queue* createQueue(int);
+bool isEmpty(Queue*);
+void resizeQueue(Queue*);
+void enqueue(Queue*, int);
+int dequeue(Queue*);
+void freeQueue(Queue*);
 
 int main() {
 
@@ -99,12 +119,12 @@ void initLabels(Graph* g) {
         exit(EXIT_FAILURE);
     }
     
-    for (int i = 0; i < g->numVertices; i++) {
-        g->nodesToLabel[i] = -1;
+    for (int vertex = 0; vertex < g->numVertices; vertex++) {
+        g->nodesToLabel[vertex] = -1;
     }
 
-    for (int i = 0; i < LABELS; i++) {
-        g->labelsCardinalities[i] = 0;
+    for (int label = 0; label < LABELS; label++) {
+        g->labelsCardinalities[label] = 0;
     }
 }
 
@@ -279,7 +299,7 @@ void printState(State* s, int numVertices) {
 }
 
 /***** VF2++ FUNCTIONS *****/
-bool checkProperties(Graph* g1, Graph* g2) {
+bool checkGraphProperties(Graph* g1, Graph* g2) {
     if (g1->numVertices != g2->numVertices || g1->numVertices == 0 || g2->numVertices == 0) {
         return false;
     }
@@ -297,19 +317,24 @@ bool checkProperties(Graph* g1, Graph* g2) {
     return true;
 }
 
-bool checkSequenceDegree(int* g1, int* g2, int size) {
-    int* tmp1 = (int*)malloc(size * sizeof(int));
-    int* tmp2 = (int*)malloc(size * sizeof(int));
-
-    if (tmp1 == NULL || tmp2 == NULL) {
-        printf("Error allocating memory in checkSequenceDegree\n");
+int* copyArray(int* arr, int size) {
+    int* copy = (int*)malloc(size * sizeof(int));
+    
+    if (copy == NULL) {
+        printf("Error allocating memory in copyArray\n");
         exit(EXIT_FAILURE);
     }
 
     for (int i = 0; i < size; i++) {
-        tmp1[i] = g1[i];
-        tmp2[i] = g2[i];
+        copy[i] = arr[i];
     }
+
+    return copy;
+}
+
+bool checkSequenceDegree(int* degree1, int* degree2, int size) {
+    int* tmp1 = copyArray(degree1, size);
+    int* tmp2 = copyArray(degree2, size);
 
     qsort(tmp1, size, sizeof(int), compare);
     qsort(tmp2, size, sizeof(int), compare);
@@ -331,24 +356,447 @@ int compare(const void* a, const void* b) {
     return (*(int*)a - *(int*)b);
 }
 
-int* ordering(Graph* g1, Graph* g2, State* state) {
-    int* order = (int*)malloc(g1->numVertices * sizeof(int));
+int* ordering(Graph* g1, Graph* g2) {
+    int* order = (int*)malloc(g1->numVertices * sizeof(int));   // order of the nodes of g1
+    int* labelRarity = copyArray(g1->labelsCardinalities, LABELS);
+    int* connectivityG1 = (int*)malloc(g1->numVertices * sizeof(int));   // number of neighbors already ordered
+    int* V1Unordered = (int*)malloc(g1->numVertices * sizeof(int));    // V1Unordered[i] = -1 if node has not been ordered yet else 1 
 
-    if (ordering == NULL) {
+    if (order == NULL || labelRarity == NULL || connectivityG1 == NULL || V1Unordered == NULL) {
         printf("Error allocating memory in ordering\n");
         exit(EXIT_FAILURE);
     }
 
-    
+    for(int i = 0; i < g1->numVertices; i++) {
+        connectivityG1[i] = 0;
+        V1Unordered[i] = -1;
+    }
 
+    int order_index = 0;
+    while (order_index < g1->numVertices) {
+        int maxRarity = INF;
+        int maxNode = -1;
+        for (int vertex = 0; vertex < g1->numVertices; vertex++) {
+            if (V1Unordered[vertex] == -1) {
+                int rarity = labelRarity[g1->nodesToLabel[vertex]];
+                if (rarity < maxRarity) {
+                    maxRarity = rarity;
+                    maxNode = vertex;
+                } else if (rarity == maxRarity) {
+                    if (g1->degrees[vertex] > g1->degrees[maxNode]) {
+                        maxNode = vertex;
+                    }
+                }
+            }
+        }
+        printf("Max node before bfs: %d\n", maxNode);
+        // int maxRarity = INT_MAX;
+        // for (int i = 0; i < g1->numVertices; i++) {
+        //     if (V1Unordered[i] == -1 && labelRarity[g1->nodesToLabel[i]] < maxRarity) {
+        //         maxRarity = labelRarity[g1->nodesToLabel[i]];
+        //     }
+        // }
+
+        // int maxNode = -1;
+        // for (int i = 0; i < g1->numVertices; i++) {
+        //     if (V1Unordered[i] == -1 && labelRarity[g1->nodesToLabel[i]] == maxRarity) {
+        //         if (maxNode == -1 || g1->degrees[i] > g1->degrees[maxNode]) {   // errore here
+        //             maxNode = i;
+        //         }
+        //     }
+        // }
+
+        int maxDepth = 0;
+       
+        int* levels = bfs(g1, maxNode, &maxDepth);
+        
+
+        int* levelNodes = (int*)malloc((g1->numVertices) * sizeof(int));
+
+        
+        
+        
+        for (int depth = 0; depth <= maxDepth; depth++) {
+            int levelSize = findLevelNodes(g1, levels, levelNodes, depth);
+            printf("Level size: %d\n", levelSize);
+            for(int i = 0; i < levelSize; i++) {
+                printf("%d ", levelNodes[i]);
+            }
+            printf("\n");
+            // processDepth()
+           
+            while (levelSize > 0) {
+                
+                // ULTIMO
+                // int maxConnectivity = -INF;  // max connectivity of the nodes in the level        
+                // int maxConnSize = 0;
+                // // int* maxConnectivityNodes = (int*)malloc(levelSize * sizeof(int));
+                // int maxRarity = INF;
+                // int nextNode = -1;
+                // int maxDegree = -INF;
+
+                // for (int i = 0; i < levelSize; i++) {
+                //     int vertex = levelNodes[i];
+                //     int conn = connectivityG1[vertex];
+
+                //     // Update maxConnectivity and reset maxConnSize if a new maximum is found
+                //     if (conn > maxConnectivity) {
+                //         maxConnectivity = conn;
+                //         // maxConnSize = 0;
+                //     }
+
+                //     // If current vertex has maxConnectivity, process it
+                //     if (conn == maxConnectivity) {
+                //         // maxConnectivityNodes[maxConnSize] = vertex;
+                //         // maxConnSize++;
+                        
+                //         // Calculate the degree and update maxDegree and nextNode if necessary
+                //         int degree = g1->degrees[vertex];
+                //         if (degree > maxDegree) {
+                //             maxDegree = degree;
+                //             // maxDegreeSize = 0;
+                //         }
+
+                //         if (degree == maxDegree) {
+                //             int rarity = labelRarity[g1->nodesToLabel[vertex]];
+                //             if (rarity < maxRarity) {
+                //                 maxRarity = rarity;
+                //                 nextNode = vertex;
+                //             }
+                //         }
+                //     }
+                // }
+            
+                // order[order_index] = nextNode;
+                // order_index++;
+                
+                // for (int i = 0; i < g1->numVertices; i++) {
+                //     if (g1->matrix[nextNode * g1->numVertices + i] == 1) {
+                //         connectivityG1[i]++;
+                //     }
+                // }
+               
+                // removeElementArray(levelNodes, &levelSize, nextNode);
+                // labelRarity[g1->nodesToLabel[nextNode]]--;
+                // V1Unordered[nextNode] = 1;
+               
+
+
+
+                //  2
+                // int maxConnectivity = -INF;         // max connectivity of the nodes in the level        
+                // int maxConnSize = 0;
+                // int* maxConnectivityNodes = (int*)malloc(levelSize * sizeof(int));
+                // for (int i = 0; i < levelSize; i++) {
+                //     int vertex = levelNodes[i];
+                //     int conn = connectivityG1[vertex];
+                //     if (conn > maxConnectivity) {
+                //         maxConnectivity = conn;
+                //         maxConnSize = 0;
+                //     }
+                //     if (conn == maxConnectivity) {
+                //         maxConnectivityNodes[maxConnSize] = vertex;
+                //         maxConnSize++;
+                //     }
+                // }
+                
+                // 1
+                int maxConnectivity = -INF;     
+                for(int i = 0; i < levelSize; i++) {
+                    int vertex = levelNodes[i];
+                    int conn = connectivityG1[vertex];
+                    if (conn > maxConnectivity) {
+                        maxConnectivity = conn;
+                    }
+                }
+
+                int* maxConnectivityNodes = (int*)malloc(levelSize * sizeof(int));  // forse errore num vertices
+                int maxConnSize = 0;
+                for(int i = 0; i < levelSize; i++) {
+                    int vertex = levelNodes[i];
+                    if (connectivityG1[vertex] == maxConnectivity) {
+                        maxConnectivityNodes[maxConnSize] = vertex;
+                        maxConnSize++;
+                    }
+                }
+
+                // int maxDegree = -INF;
+                // int maxDegreeSize = 0;
+                // int* maxDegreeNodes = (int*)malloc(maxConnSize * sizeof(int));
+                // for(int i = 0; i < maxConnSize; i++) {
+                //     int vertex = maxConnectivityNodes[i];
+                //     int degree = g1->degrees[vertex];
+                //     if(degree > maxDegree) {
+                //         maxDegree = degree;
+                //         maxDegreeSize = 0; // Reset the size counter for new max degree
+                //     }
+                //     if(degree == maxDegree) {
+                //         maxDegreeNodes[maxDegreeSize] = vertex;
+                //         maxDegreeSize++;
+                //     }
+                // }
+                
+                // 2
+                // int maxRarity = INF;
+                // int nextNode = -1;
+                // int maxDegree = -INF;
+                // int maxDegreeSize = 0;
+                // for (int i = 0; i < maxConnSize; i++) {
+                //     int vertex = maxConnectivityNodes[i];
+                //     int degree = g1->degrees[vertex];
+
+                //     if (degree > maxDegree) {
+                //         maxDegree = degree;
+                //         maxDegreeSize = 0; // Reset the size counter for new max degree
+                //     }
+
+                //     if (degree == maxDegree) {
+                //         int rarity = labelRarity[g1->nodesToLabel[vertex]];
+
+                //         if (rarity < maxRarity) {
+                //             maxRarity = rarity;
+                //             nextNode = vertex;
+                //         }
+
+                //         // maxDegreeNodes[maxDegreeSize] = vertex;
+                //         // maxDegreeSize++;
+                //     }
+                    
+                // }
+
+                // 1
+                int maxDegree = -INF;
+                for(int i = 0; i < maxConnSize; i++) {
+                    int vertex = maxConnectivityNodes[i];
+                    int degree = g1->degrees[vertex];   
+                    if (degree > maxDegree) {
+                        maxDegree = degree;
+                    }
+                }
+
+                int* maxDegreeNodes = (int*)malloc(maxConnSize * sizeof(int));
+                int maxDegreeSize = 0;
+                for(int i = 0; i < maxConnSize; i++) {
+                    int vertex = maxConnectivityNodes[i];
+                    int degree = g1->degrees[vertex];
+                    if(degree == maxDegree) {
+                        maxDegreeNodes[maxDegreeSize] = vertex;
+                        maxDegreeSize++;
+                    }
+                }
+
+                int maxRarity = INF;  
+                int nextNode = -1;
+                for(int i = 0; i < maxDegreeSize; i++) {
+                    int vertex = maxDegreeNodes[i];
+                    int rarity = labelRarity[g1->nodesToLabel[vertex]];
+                    if(rarity < maxRarity) {
+                        maxRarity = rarity;
+                        nextNode = vertex;
+                    }
+                }
+
+                free(maxConnectivityNodes);
+                free(maxDegreeNodes);
+
+                order[order_index] = nextNode;
+                order_index++;
+                
+                for (int i = 0; i < g1->numVertices; i++) {
+                    if (g1->matrix[nextNode * g1->numVertices + i] == 1) {
+                        connectivityG1[i]++;
+                    }
+                }
+               
+                removeElementArray(levelNodes, &levelSize, nextNode);
+                labelRarity[g1->nodesToLabel[nextNode]]--;
+                V1Unordered[nextNode] = 1;
+            }
+            
+            
+
+
+
+            
+
+
+            // for (int i = 0; i < g1->numVertices; i++) {
+            //     if (levels[i] == depth) {
+            //         int node = i;
+            //         while (node != -1) {
+            //             int max_used_degree = -1;
+            //             for (int j = 0; j < g1->numVertices; j++) {
+            //                 if (V1Unordered[j] == -1 && g1->matrix[node * g1->numVertices + j] && usedDegreeG1[j] > max_used_degree) {
+            //                     max_used_degree = usedDegreeG1[j];
+            //                 }
+            //             }
+
+            //             int maxNode = -1;
+            //             for (int j = 0; j < g1->numVertices; j++) {
+            //                 if (V1Unordered[j] == -1 && g1->matrix[node * g1->numVertices + j] && usedDegreeG1[j] == max_used_degree) {
+            //                     if (maxNode == -1 || g1->degrees[j] > g1->degrees[maxNode]) {
+            //                         maxNode = j;
+            //                     }
+            //                 }
+            //             }
+
+            //             V1Unordered[maxNode] = 1;
+            //             order[index++] = maxNode;
+            //             usedDegreeG1[maxNode] = -1;
+            //             for (int j = 0; j < g1->numVertices; j++) {
+            //                 if (g1->matrix[maxNode * g1->numVertices + j]) {
+            //                     usedDegreeG1[j]++;
+            //                 }   
+            //             }
+            //         }
+            //     }
+            // }
+
+        }
+        free(levels);
+        free(levelNodes);
+    }
+                    
+    free(labelRarity);
+    free(connectivityG1);
+    free(V1Unordered);
+    
+    printf("Order\n");
+    for (int i = 0; i < g1->numVertices; i++) {
+        printf("%d ", order[i]);
+    }
     return order;
 }
 
+int findLevelNodes(Graph* g, int* levels, int* levelNodes, int depth) {
+    int i = 0;
+    for(int vertex = 0; vertex < g->numVertices; vertex++) {
+        if (levels[vertex] == depth) {
+            levelNodes[i] = vertex;
+            i++;
+        }
+    }
+    return i;
+}
+
+int* bfs(Graph* g, int root, int* maxDepth) {
+    int* levels = (int*)malloc(g->numVertices * sizeof(int));
+
+    if (levels == NULL) {
+        printf("Error allocating memory in bfs\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for(int vertex = 0; vertex < g->numVertices; vertex++) {
+        levels[vertex] = -1;
+    }
+
+    Queue* queue = createQueue(g->numVertices/2);
+    enqueue(queue, root);
+    levels[root] = 0;
+
+    *maxDepth = 0;
+    while (!isEmpty(queue)) {
+        int node = dequeue(queue);
+        for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
+            if (g->matrix[node * g->numVertices + adjVertex] == 1 && levels[adjVertex] == -1) {
+                enqueue(queue, adjVertex);
+                int depth = levels[node] + 1;
+                levels[adjVertex] = depth;
+                if (depth > *maxDepth) {
+                    *maxDepth = depth;
+                }
+            }
+        }
+    }
+    freeQueue(queue);
+    return levels;
+}
+
+void removeElementArray(int* arr, int* size, int element) {
+    for (int i = 0; i < *(size); i++) {
+        if (arr[i] == element) {
+            for (int j = i; j < *(size) - 1; j++) {
+                arr[j] = arr[j + 1];
+            }
+            break;
+        }
+    }
+    *size = *size - 1;
+}
+
 void vf2pp(Graph* g1, Graph* g2, State* state) {
-    if (!checkProperties(g1, g2)) {
+    if (!checkGraphProperties(g1, g2)) {
         printf("Graphs are not isomorphic\n");
         return;
     }
 
+    int* order = ordering(g1, g2);
+    // fai altro
+    free(order);
+
     printf("Graphs are isomorphic\n");
 }
+
+/***** QUEUE FUNCTIONS *****/
+Queue* createQueue(int capacity) {
+    Queue* q = (Queue*)malloc(sizeof(Queue));
+    q->data = (int*)malloc(capacity * sizeof(int));
+    q->head = -1;
+    q->tail = -1;
+    q->capacity = capacity;
+
+    if (q == NULL || q->data == NULL) {
+        printf("Error allocating memory in createQueue\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return q;
+}
+
+bool isEmpty(Queue* q) {
+    return q->head == -1;
+}
+
+void resizeQueue(Queue* q) {
+    q->capacity *= 2;
+    q->data = (int*)realloc(q->data, q->capacity * sizeof(int));
+
+    if (q->data == NULL) {
+        printf("Error reallocating memory in resizeQueue\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void enqueue(Queue* q, int item) {
+    if (q->tail == q->capacity - 1) {
+        resizeQueue(q);
+    }
+    if (isEmpty(q)) {
+        q->head = 0;
+    }
+    q->tail++;
+    q->data[q->tail] = item;
+}
+
+int dequeue(Queue* q) {
+    if (isEmpty(q)) {
+        return -1;
+    } else {
+        int item = q->data[q->head];
+        q->head++;
+        if (q->head > q->tail) {
+            q->head = -1;
+            q->tail = -1;
+        }
+        return item;
+    }
+}
+
+void freeQueue(Queue* q) {
+    free(q->data);
+    free(q);
+    q = NULL;
+}
+
+

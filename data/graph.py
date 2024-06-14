@@ -6,7 +6,7 @@ import os
 FILENAME1 = "graph_query.csv"
 FILENAME2 = "graph_target.csv"
 LABELS = 10
-NODES = 550
+NODES = 10
 
 # Function to save graph to CSV
 def save_graph_to_csv(graph, filename):
