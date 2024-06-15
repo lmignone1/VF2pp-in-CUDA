@@ -383,6 +383,23 @@ int* ordering(Graph* g1, Graph* g2) {
             }
         }
         
+        // prevoious version of the for compatted in the for above
+        // int maxRarity = INT_MAX;
+        // for (int i = 0; i < g1->numVertices; i++) {
+        //     if (V1Unordered[i] == -1 && labelRarity[g1->nodesToLabel[i]] < maxRarity) {
+        //         maxRarity = labelRarity[g1->nodesToLabel[i]];
+        //     }
+        // }
+
+        // int maxNode = -1;
+        // for (int i = 0; i < g1->numVertices; i++) {
+        //     if (V1Unordered[i] == -1 && labelRarity[g1->nodesToLabel[i]] == maxRarity) {
+        //         if (maxNode == -1 || g1->degrees[i] > g1->degrees[maxNode]) {   // errore here
+        //             maxNode = i;
+        //         }
+        //     }
+        // }
+
         int maxDepth = 0;
         int* levels = bfs(g1, maxNode, &maxDepth);
         int* levelNodes = (int*)malloc((g1->numVertices) * sizeof(int));
@@ -390,13 +407,25 @@ int* ordering(Graph* g1, Graph* g2) {
         for (int depth = 0; depth <= maxDepth; depth++) {
             int levelSize = findLevelNodes(g1, levels, levelNodes, depth);
             processDepth(order, &order_index, g1, connectivityG1, labelRarity, V1Unordered, levelNodes, &levelSize);
+            // for(int i = 0; i < levelSize; i++) {
+            //     printf("%d ", levelNodes[i]);
+            // }
+            // printf("\n");
+            // processDepth()
+           
         }
         free(levels);
         free(levelNodes);
-    }           
+    }
+                    
     free(labelRarity);
     free(connectivityG1);
     free(V1Unordered);
+    
+    printf("Order\n");
+    for (int i = 0; i < g1->numVertices; i++) {
+        printf("%d ", order[i]);
+    }
     return order;
 }
 
@@ -467,16 +496,20 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
         for(int i = 0; i < *levelSize; i++) {
             int vertex = levelNodes[i];
             int conn = connectivityG1[vertex];
+            
             if (conn > maxConnectivity) {
                 maxConnectivity = conn;
                 maxDegree = -INF; 
             }
+
             if (conn == maxConnectivity) {
                 int degree = g->degrees[vertex];
+
                 if (degree > maxDegree) {
                     maxDegree = degree;
                     maxRarity = INF;
                 }
+
                 if (degree == maxDegree) {
                     int rarity = labelRarity[g->nodesToLabel[vertex]];
                     if(rarity < maxRarity) {
@@ -486,6 +519,62 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
                 }
             }
         }
+            
+
+        // VERSIONE FUNZIONANTE NON OTTIMIZZATA
+        // int maxConnectivity = -INF;     
+        // for(int i = 0; i < levelSize; i++) {
+        //     int vertex = levelNodes[i];
+        //     int conn = connectivityG1[vertex];
+        //     if (conn > maxConnectivity) {
+        //         maxConnectivity = conn;
+        //     }
+        // }
+
+        // int* maxConnectivityNodes = (int*)malloc(levelSize * sizeof(int));  // forse errore num vertices
+        // int maxConnSize = 0;
+        // for(int i = 0; i < levelSize; i++) {
+        //     int vertex = levelNodes[i];
+        //     if (connectivityG1[vertex] == maxConnectivity) {
+        //         maxConnectivityNodes[maxConnSize] = vertex;
+        //         maxConnSize++;
+        //     }
+        // }
+
+        // // 1
+        // int maxDegree = -INF;
+        // for(int i = 0; i < maxConnSize; i++) {
+        //     int vertex = maxConnectivityNodes[i];
+        //     int degree = g1->degrees[vertex];   
+        //     if (degree > maxDegree) {
+        //         maxDegree = degree;
+        //     }
+        // }
+
+        // int* maxDegreeNodes = (int*)malloc(maxConnSize * sizeof(int));
+        // int maxDegreeSize = 0;
+        // for(int i = 0; i < maxConnSize; i++) {
+        //     int vertex = maxConnectivityNodes[i];
+        //     int degree = g1->degrees[vertex];
+        //     if(degree == maxDegree) {
+        //         maxDegreeNodes[maxDegreeSize] = vertex;
+        //         maxDegreeSize++;
+        //     }
+        // }
+
+        // int maxRarity = INF;  
+        // int nextNode = -1;
+        // for(int i = 0; i < maxDegreeSize; i++) {
+        //     int vertex = maxDegreeNodes[i];
+        //     int rarity = labelRarity[g1->nodesToLabel[vertex]];
+        //     if(rarity < maxRarity) {
+        //         maxRarity = rarity;
+        //         nextNode = vertex;
+        //     }
+        // }
+
+        // free(maxConnectivityNodes);
+        // free(maxDegreeNodes);
         
         order[*order_index] = nextNode;
         *order_index = *order_index + 1;    
@@ -509,7 +598,7 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
     }
 
     int* order = ordering(g1, g2);
-    
+    // fai altro
     free(order);
 
     printf("Graphs are isomorphic\n");
