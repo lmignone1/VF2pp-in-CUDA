@@ -11,7 +11,8 @@
 typedef struct {
     int* matrix;
     int numVertices;
-    int* nodesToLabel;  //manca labelToNodes che potrebbe essere implementato come una funzione a cui passo la label e amen (oppure linked list)
+    int* nodesToLabel; 
+    int** labelToNodes; // alternativa: funzione
     int* labelsCardinalities;
     int* degrees;
 } Graph;
@@ -34,7 +35,7 @@ typedef struct {
 
 /***** GRAPH PROTOTYPES *****/
 int* createAdjMatrix(int);
-void initLabels(Graph*);
+void initGraph(Graph*);
 Graph* createGraph();
 void addEdge(Graph*, int, int);
 Graph* readGraph(char*);
@@ -42,7 +43,6 @@ void printGraph(Graph*);
 void freeGraph(Graph*);
 void setLabel(Graph*, int, int);
 int* labelsCardinalities(int);
-int* degrees(Graph*);
 
 /***** STATE PROTOTYPES *****/
 State* createState(Graph*, Graph*);
@@ -70,8 +70,9 @@ int dequeue(Queue*);
 void freeQueue(Queue*);
 
 int main() {
-
+    printf("%s\n", FILENAME_QUERY);
     Graph* g1 = readGraph(FILENAME_QUERY);
+    printf("%s\n", FILENAME_TARGET);
     Graph* g2 = readGraph(FILENAME_TARGET);
     State* s = createState(g1, g2);
     vf2pp(g1, g2, s);
@@ -103,21 +104,25 @@ int* createAdjMatrix(int numVertices) {
     return matrix;
 }
 
-void initLabels(Graph* g) {
+void initGraph(Graph* g) {
     g->nodesToLabel = (int*)malloc(g->numVertices * sizeof(int));
     g->labelsCardinalities = (int*)malloc(LABELS * sizeof(int));
+    g->labelToNodes = (int**)malloc(LABELS * sizeof(int*));
+    g->degrees = (int*)malloc(g->numVertices * sizeof(int));
 
-    if (g->nodesToLabel == NULL || g->labelsCardinalities == NULL) {
-        printf("Error allocating memory in initLabels\n");
+    if (g->nodesToLabel == NULL || g->labelsCardinalities == NULL || g->labelToNodes == NULL || g->degrees == NULL) {
+        printf("Error allocating memory in initGraph\n");
         exit(EXIT_FAILURE);
     }
     
     for (int vertex = 0; vertex < g->numVertices; vertex++) {
         g->nodesToLabel[vertex] = -1;
+        g->degrees[vertex] = 0;
     }
 
     for (int label = 0; label < LABELS; label++) {
         g->labelsCardinalities[label] = 0;
+        g->labelToNodes[label] = malloc(g->numVertices * sizeof(int));
     }
 }
 
@@ -125,12 +130,15 @@ void setLabel(Graph* g, int node, int label) {
     if (g->nodesToLabel[node] == -1) {
         g->nodesToLabel[node] = label;
         g->labelsCardinalities[label]++;
+        g->labelToNodes[label][g->labelsCardinalities[label] - 1] = node;
     }
 }
 
 void addEdge(Graph* g, int src, int target) {
     g->matrix[src * g->numVertices + target] = 1;
     g->matrix[target * g->numVertices + src] = 1;
+    g->degrees[src]++;
+    g->degrees[target]++;
 }
 
 Graph* createGraph() {
@@ -146,6 +154,7 @@ Graph* createGraph() {
     g->nodesToLabel = NULL;
     g->labelsCardinalities = NULL;
     g->degrees = NULL;
+    g->labelToNodes = NULL;
     return g;
 }
 
@@ -165,7 +174,7 @@ Graph* readGraph(char* path) {
     fgets(line, sizeof(line), f); // skip the header
 
     g->matrix = createAdjMatrix(g->numVertices);
-    initLabels(g);
+    initGraph(g);
 
     while (fgets(line, sizeof(line), f)) {
         sscanf(line, "%d,%d,%d,%d", &src, &target, &srcLabel, &targetLabel);
@@ -175,7 +184,11 @@ Graph* readGraph(char* path) {
     }
     
     fclose(f);
-    g->degrees = degrees(g);
+
+    for(int label = 0; label < LABELS; label++) {
+        g->labelToNodes[label] = (int*)realloc(g->labelToNodes[label], g->labelsCardinalities[label] * sizeof(int));
+    }
+    
     return g;
 }
 
@@ -191,9 +204,20 @@ void printGraph(Graph* g) {
     for (int i = 0; i < LABELS; i++) {
         printf("Label %d: %d\n", i, g->labelsCardinalities[i]);
     }
+
+    for(int i = 0; i < LABELS; i++) {
+       printf("\nLabel %d\n", i);
+       for(int j = 0; j < g->labelsCardinalities[i]; j++) {
+           printf("%d ", g->labelToNodes[i][j]);
+       }
+    }
 }
 
 void freeGraph(Graph* g) {
+    for(int i = 0; i < g->numVertices; i++) {
+        free(g->labelToNodes[i]);
+    }
+    free(g->labelToNodes);
     free(g->matrix);
     free(g->nodesToLabel);
     free(g->labelsCardinalities);
@@ -202,22 +226,22 @@ void freeGraph(Graph* g) {
     g = NULL;
 }
 
-int* degrees(Graph* g) {
-    int* degrees = (int*)malloc(g->numVertices * sizeof(int));
+// int* degrees(Graph* g) {
+//     int* degrees = (int*)malloc(g->numVertices * sizeof(int));
     
-    if (degrees == NULL) {
-        printf("Error allocating memory in degrees\n");
-        exit(EXIT_FAILURE);
-    }
+//     if (degrees == NULL) {
+//         printf("Error allocating memory in degrees\n");
+//         exit(EXIT_FAILURE);
+//     }
 
-    for (int i = 0; i < g->numVertices; i++) {
-        for (int j = 0; j < g->numVertices; j++) {
-            degrees[i] += g->matrix[i * g->numVertices + j];
-        }
-    }
+//     for (int i = 0; i < g->numVertices; i++) {
+//         for (int j = 0; j < g->numVertices; j++) {
+//             degrees[i] += g->matrix[i * g->numVertices + j];
+//         }
+//     }
     
-    return degrees;
-}
+//     return degrees;
+// }
 
 /***** STATE FUNCTIONS *****/
 State* createState(Graph* g1, Graph* g2) {
@@ -351,7 +375,7 @@ int compare(const void* a, const void* b) {
 
 int* ordering(Graph* g1, Graph* g2) {
     int* order = (int*)malloc(g1->numVertices * sizeof(int));   // order of the nodes of g1
-    int* labelRarity = copyArray(g1->labelsCardinalities, LABELS);
+    int* labelRarity = copyArray(g1->labelsCardinalities, LABELS);  // FORSE POSSIAMO EVITARE LA COPIA E USARE DIRETTAMENTE g1->labelsCardinalities
     int* connectivityG1 = (int*)malloc(g1->numVertices * sizeof(int));   // number of neighbors already ordered
     int* V1Unordered = (int*)malloc(g1->numVertices * sizeof(int));    // V1Unordered[i] = -1 if node has not been ordered yet else 1 
 
@@ -397,6 +421,10 @@ int* ordering(Graph* g1, Graph* g2) {
     free(labelRarity);
     free(connectivityG1);
     free(V1Unordered);
+
+    for(int i = 0; i < g1->numVertices; i++) {
+        printf("%d ", order[i]);
+    }
     return order;
 }
 
@@ -500,6 +528,10 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
         labelRarity[g->nodesToLabel[nextNode]]--;
         V1Unordered[nextNode] = 1;
     }
+}
+
+int* match(int node, Graph* g2, State* state) {
+    
 }
 
 void vf2pp(Graph* g1, Graph* g2, State* state) {

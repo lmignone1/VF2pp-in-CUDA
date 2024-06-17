@@ -34,7 +34,7 @@ typedef struct {
 
 /***** GRAPH PROTOTYPES *****/
 int* createAdjMatrix(int);
-void initLabels(Graph*);
+void initGraph(Graph*);
 Graph* createGraph();
 void addEdge(Graph*, int, int);
 Graph* readGraph(char*);
@@ -103,12 +103,12 @@ int* createAdjMatrix(int numVertices) {
     return matrix;
 }
 
-void initLabels(Graph* g) {
+void initGraph(Graph* g) {
     g->nodesToLabel = (int*)malloc(g->numVertices * sizeof(int));
     g->labelsCardinalities = (int*)malloc(LABELS * sizeof(int));
 
     if (g->nodesToLabel == NULL || g->labelsCardinalities == NULL) {
-        printf("Error allocating memory in initLabels\n");
+        printf("Error allocating memory in initGraph\n");
         exit(EXIT_FAILURE);
     }
     
@@ -165,7 +165,7 @@ Graph* readGraph(char* path) {
     fgets(line, sizeof(line), f); // skip the header
 
     g->matrix = createAdjMatrix(g->numVertices);
-    initLabels(g);
+    initGraph(g);
 
     while (fgets(line, sizeof(line), f)) {
         sscanf(line, "%d,%d,%d,%d", &src, &target, &srcLabel, &targetLabel);
