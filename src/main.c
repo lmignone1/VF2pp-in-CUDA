@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define FILENAME_QUERY "../data/graph_query.csv"
-#define FILENAME_TARGET "../data/graph_target.csv"
+#define FILENAME_QUERY "../data/graph_query_example.csv"
+#define FILENAME_TARGET "../data/graph_target_example.csv"
 #define LABELS 10
 #define INF 99999
 
@@ -15,6 +15,7 @@ typedef struct {
     int** labelToNodes; // alternativa: funzione
     int* labelsCardinalities;
     int* degrees;
+    int maxDegree;
 } Graph;
 
 typedef struct {
@@ -33,6 +34,17 @@ typedef struct {
     int capacity;
 } Queue;
 
+typedef struct {
+    int vertex;
+    int* candidates;
+    int sizeCandidates;
+} Info;
+
+typedef struct StackNode {
+    Info* info;
+    struct StackNode* next;
+} StackNode;
+
 /***** GRAPH PROTOTYPES *****/
 int* createAdjMatrix(int);
 void initGraph(Graph*);
@@ -48,6 +60,7 @@ int* labelsCardinalities(int);
 State* createState(Graph*, Graph*);
 void freeState(State*);
 void printState(State*, int);
+bool isMappingFull(Graph*, State*);
 
 /***** VF2++ PROTOTYPES *****/
 void vf2pp(Graph*, Graph*, State*);
@@ -60,14 +73,34 @@ int* bfs(Graph*, int, int*);
 int findLevelNodes(Graph*, int*, int*, int);
 void removeElementArray(int*, int*, int);
 void processDepth(int*, int*, Graph*, int*, int*, int*, int*, int*);
+int* findCoveredNeighbors(Graph*, State*, int, int*);
+int* findCandidates(Graph*, Graph*, State*, int, int*);
+int intersectionCount(int*, int, int*);
+int* findNodesOfLabel(int*, Graph*, int, int, int*);
+bool cutISO(Graph*, Graph*, State*, int, int);
+int* findNeighbors(Graph*, int, int*);
+bool checkLabels(Graph*, Graph*, int*, int*, int, int, int*);
 
-/***** Queue FUNCTIONS *****/
+/***** QUEUE PROTOTYPES *****/
 Queue* createQueue(int);
 bool isQueueEmpty(Queue*);
 void resizeQueue(Queue*);
 void enqueue(Queue*, int);
 int dequeue(Queue*);
 void freeQueue(Queue*);
+
+/***** STACK PROTOTYPES *****/
+Info* createInfo(int* candidates, int sizeCandidates, int vertex);
+StackNode* createStackNode(Info*);
+void push(StackNode**, int*, int, int);
+Info* pop(StackNode**);
+bool isStackEmpty(StackNode*);
+void freeStack(StackNode*);
+void printStack(StackNode*);
+void printInfo(Info*);
+void freeInfo(Info*);
+StackNode* createStack();
+Info* peek(StackNode**);
 
 int main() {
     printf("%s\n", FILENAME_QUERY);
@@ -76,14 +109,18 @@ int main() {
     Graph* g2 = readGraph(FILENAME_TARGET);
     State* s = createState(g1, g2);
     vf2pp(g1, g2, s);
+    
+    printf("\nMapping\n");
+    for(int i = 0; i < g1->numVertices; i++) {
+        printf("%d -> %d\n", i, s->mapping1[i]);
+    }
+
     freeGraph(g1);
     freeGraph(g2);
     freeState(s);
 
     return EXIT_SUCCESS;
 }
-
-
 
 /***** GRAPH FUNCTIONS *****/
 
@@ -139,6 +176,8 @@ void addEdge(Graph* g, int src, int target) {
     g->matrix[target * g->numVertices + src] = 1;
     g->degrees[src]++;
     g->degrees[target]++;
+    int degree = g->degrees[src] > g->degrees[target] ? g->degrees[src] : g->degrees[target];
+    g->maxDegree = degree > g->maxDegree ? degree : g->maxDegree;
 }
 
 Graph* createGraph() {
@@ -155,6 +194,7 @@ Graph* createGraph() {
     g->labelsCardinalities = NULL;
     g->degrees = NULL;
     g->labelToNodes = NULL;
+    g->maxDegree = 0;
     return g;
 }
 
@@ -261,8 +301,8 @@ State* createState(Graph* g1, Graph* g2) {
 
     for (int i = 0; i < g1->numVertices; i++) {
         s->mapping1[i] = -1;
-        s->T1[i] = 1;
-        s->T1_out[i] = -1;
+        s->T1[i] = -1;
+        s->T1_out[i] = 1;
 
         s->mapping2[i] = -1;
         s->T2[i] = -1;
@@ -313,6 +353,15 @@ void printState(State* s, int numVertices) {
     for (int i = 0; i < numVertices; i++) {
         printf("%d ", s->T2_out[i]);
     }
+}
+
+bool isMappingFull(Graph* g, State* state) {
+    for(int i = 0; i < g->numVertices; i++) {
+        if(state->mapping1[i] == -1) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /***** VF2++ FUNCTIONS *****/
@@ -422,9 +471,9 @@ int* ordering(Graph* g1, Graph* g2) {
     free(connectivityG1);
     free(V1Unordered);
 
-    for(int i = 0; i < g1->numVertices; i++) {
-        printf("%d ", order[i]);
-    }
+    // for(int i = 0; i < g1->numVertices; i++) {
+    //     printf("%d ", order[i]);
+    // }
     return order;
 }
 
@@ -530,8 +579,168 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
     }
 }
 
-int* match(int node, Graph* g2, State* state) {
+int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandidates) {  
+    // void findCandidates(int u, GraphParams *graph_params, StateParams *state_params, int *candidates, int *candidate_count) {
+    // Graph *G1 = graph_params->G1;
+    // Graph *G2 = graph_params->G2;
+    // int *G1_labels = graph_params->G1_labels;
+    // int **nodes_of_G2Labels = graph_params->nodes_of_G2Labels;
+    // int **G2_nodes_of_degree = graph_params->G2_nodes_of_degree;
+
+    // int *mapping = state_params->mapping;
+    // int *reverseMapping = state_params->reverseMapping;
+    // bool *T2_out = state_params->T2_out;
+    // ------------------------
+    int coveredNeighborsSize = 0;
+    int *coveredNeighbors = findCoveredNeighbors(g1, state, node, &coveredNeighborsSize);
+
+    printf("CoveredNeighbors: ");
+    for(int i = 0; i < coveredNeighborsSize; i++) {
+        printf("%d ", coveredNeighbors[i]);
+    }
+
+    if(coveredNeighborsSize == 0) {
+        // A
+        int label = g1->nodesToLabel[node];
+        int maxSizeCandidates = g2->labelsCardinalities[label];
+        // int* candidates = copyArray(g2->labelToNodes[label], sizeCandidates);
+        int* candidates = malloc(maxSizeCandidates * sizeof(int));
+
+        *sizeCandidates = 0;
+        for(int i = 0; i < maxSizeCandidates; i++) {
+            int vertex = g2->labelToNodes[label][i];  // g2->labelToNodes[label] is list of candidates
+            if(g2->degrees[vertex] == g1->degrees[node] && state->T2_out[vertex] == 1 && state->mapping2[vertex] != 1) {
+                candidates[*sizeCandidates] = vertex;
+                *sizeCandidates = *sizeCandidates + 1;
+            }
+        }
+        free(coveredNeighbors);
     
+        printf("\nCandidates:");
+        for(int i = 0; i < *sizeCandidates; i++) {
+            printf("%d ", candidates[i]);
+        }
+        return candidates;
+    }
+    
+    // B
+    int* commonNodes = (int*)malloc(g2->numVertices * sizeof(int));
+    for(int i = 0; i < g2->numVertices; i++) {
+        commonNodes[i] = 1;  
+    }
+
+    int count = 0;
+    for(int i = 0; i < coveredNeighborsSize; i++) {
+        int nbrG1 = coveredNeighbors[i];
+        int mappedG2 = state->mapping1[nbrG1];
+
+        for(int adjVertex = 0; adjVertex < g2->numVertices; adjVertex++) {
+            if(g2->matrix[mappedG2 * g2->numVertices + adjVertex] == 0) {
+                commonNodes[adjVertex] = 0;
+                count++;
+            }
+        }
+    }
+
+    int commonNodesSize = g2->numVertices - count;
+    int* candidates = (int*)malloc(commonNodesSize * sizeof(int));
+
+    int label = g1->nodesToLabel[node];
+    int maxSizeCandidates = g2->labelsCardinalities[label];
+    *sizeCandidates = 0;
+    for(int i = 0; i < maxSizeCandidates; i++) {
+        int vertex = g2->labelToNodes[label][i];
+        if(commonNodes[vertex] == 1 && g2->degrees[vertex] == g1->degrees[node] && state->mapping2[vertex] != -1) {
+            candidates[*sizeCandidates] = vertex;
+            *sizeCandidates = *sizeCandidates + 1;
+        }
+    }
+    
+    // int label = g1->nodesToLabel[node];
+    // for(int i = 0; i < commonNodesSize; i++) {
+    //     int* verticies = g2->labelToNodes[label];
+
+
+
+    //     if(commonNodes[i] && g2->nodesToLabel[i] == label && g2->degrees[i] == g1->degrees[node] && state->T2_out[i] == 1 && state->mapping2[i] == -1) {
+    //         candidates[i] = i;
+    //     }
+    // }
+
+
+    
+    // int* candidates = (int*)malloc(maxSizeCandidates * sizeof(int));
+
+
+    free(coveredNeighbors);
+    free(commonNodes);
+    printf("CommonNodes: ");
+    for(int i = 0; i < *sizeCandidates; i++) {
+        printf("%d ", candidates[i]);
+    }
+    return candidates;
+
+
+
+    // if (covered_neighbors[0] == -1) {
+    //     // A
+    //     for (int i = 0; nodes_of_G2Labels[G1_labels[u]][i] != -1; i++) {
+    //         int node = nodes_of_G2Labels[G1_labels[u]][i];
+    //         if (G2_nodes_of_degree[G1->degrees[u]][node] &&
+    //             T2_out[node] && reverseMapping[node] == -1) {
+    //             if (!isMultiGraph(G1) || G1->matrix[u][u] == G2->matrix[node][node]) {
+    //                 candidates[*candidate_count] = node;
+    //                 (*candidate_count)++;
+    //             }
+    //         }
+    //     }
+    // } else {
+    //     //B
+    //     int common_nodes[G2->numVertices];
+    //     int common_count = 0;
+    //     for (int i = 0; i < G2->numVertices; i++) {
+    //         common_nodes[i] = 1;
+    //     }
+    //     for (int i = 0; covered_neighbors[i] != -1; i++) {
+    //         int nbr1 = covered_neighbors[i];
+    //         for (int j = 0; j < G2->numVertices; j++) {
+    //             if (!G2->matrix[mapping[nbr1]][j]) {
+    //                 common_nodes[j] = 0;
+    //             }
+    //         }
+    //     }
+
+    //     for (int i = 0; i < G2->numVertices; i++) {
+    //         if (common_nodes[i] &&
+    //             G2_nodes_of_degree[G1->degrees[u]][i] &&
+    //             nodes_of_G2Labels[G1_labels[u]][i] &&
+    //             reverseMapping[i] == -1) {
+    //             if (!isMultiGraph(G1) || G1->matrix[u][u] == G2->matrix[i][i]) {
+    //                 candidates[*candidate_count] = i;
+    //                 (*candidate_count)++;
+    //             }
+    //         }
+    //     }
+    // }
+    // free(covered_neighbors);
+}
+
+int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
+    int* coveredNeighbors = (int*)malloc(g->degrees[node] * sizeof(int));   // possono essere al massimo maxDegreen (non vero)
+    
+    if(coveredNeighbors == NULL) {
+        printf("Error allocating memory in findCoveredNeighbors\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
+        if (g->matrix[node * g->numVertices + adjVertex] == 1 && state->mapping1[adjVertex] != -1) {
+            coveredNeighbors[*size] = adjVertex;
+            *size = *size + 1;
+        }
+    }
+    
+    return coveredNeighbors;
 }
 
 void vf2pp(Graph* g1, Graph* g2, State* state) {
@@ -541,10 +750,189 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
     }
 
     int* order = ordering(g1, g2);
+      
+    int sizeCandidates = 0;
+    int* candidates = findCandidates(g1, g2, state, order[0], &sizeCandidates);
     
-    free(order);
+    StackNode* stack = createStack(); 
+    push(&stack, candidates, sizeCandidates, order[0]);
+    int matchingNode = 1;
+    while (!isStackEmpty(stack)) {
+        Info* info = peek(&stack);
+        bool isMatch = false;
 
-    printf("Graphs are isomorphic\n");
+        for(int i = 0; i < info->sizeCandidates; i++) {
+            int candidate = info->candidates[i];
+
+            if(!cutISO(g1, g2, state, info->vertex, candidate)) {
+                
+                if(isMappingFull(g1, state)) {
+                    freeStack(stack);
+                    free(order);
+                    printf("\nGraphs are isomorphic\n");
+                    return;
+                }
+
+                state->mapping1[info->vertex] = candidate;
+                state->mapping2[candidate] = info->vertex;
+                // update state
+                candidates = findCandidates(g1, g2, state, order[matchingNode], &sizeCandidates);
+                push(&stack, candidates, sizeCandidates, order[matchingNode]);
+                matchingNode++;
+                isMatch = true;
+                break;
+            }
+        }
+
+        // no more candidates
+        if(!isMatch) {
+            Info* tmp = pop(&stack);
+            freeInfo(tmp);
+            matchingNode--;
+
+            // backtracking
+            if(!isStackEmpty(stack)) {
+                Info* prevInfo = peek(&stack);
+                int candidate = state->mapping1[prevInfo->vertex];
+                state->mapping1[prevInfo->vertex] = -1;
+                state->mapping2[candidate] = -1;
+                // restore state
+            }
+        }
+    }
+    free(order);
+    freeStack(stack);
+}
+
+bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
+    int nbrSize1 = 0, nbrSize2 = 0;
+    int* neighbors1 = findNeighbors(g1, node1, &nbrSize1);
+    int* neighbors2 = findNeighbors(g2, node2, &nbrSize2);
+
+    int* labelsNbr = (int*)malloc(LABELS * sizeof(int));
+
+    if(labelsNbr == NULL) {
+        printf("Error allocating memory in cutISO\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(!checkLabels(g1, g2, neighbors1, neighbors2, nbrSize1, nbrSize2, labelsNbr)) {   // verifica almeno una corrispondenza G1 a G2
+        free(neighbors1);
+        free(neighbors2);
+        free(labelsNbr);
+        return true;
+    }
+
+    // se sono qui vuol dire che le label sono uguali (hanno tutti una corrispondenza)
+    for(int label = 0; label < LABELS; label++) {
+        if (labelsNbr[label] == 1) {    // se è effettivamente una label del vicinato
+            int G1NodesOfLabelSize = 0;
+            int* G1NodesOfLabel = findNodesOfLabel(neighbors1, g1, label, nbrSize1, &G1NodesOfLabelSize);
+            int G2NodesOfLabelSize = 0;
+            int* G2NodesOfLabel = findNodesOfLabel(neighbors2, g2, label, nbrSize2, &G2NodesOfLabelSize);
+
+            int count1 = intersectionCount(G1NodesOfLabel, G1NodesOfLabelSize, state->T1);
+            int count2 = intersectionCount(G2NodesOfLabel, G2NodesOfLabelSize, state->T2);
+            int count3 = intersectionCount(G1NodesOfLabel, G1NodesOfLabelSize, state->T1_out);
+            int count4 = intersectionCount(G2NodesOfLabel, G2NodesOfLabelSize, state->T2_out);
+
+            free(G1NodesOfLabel);
+            free(G2NodesOfLabel);
+
+            if(count1 != count2 || count3 != count4) {
+                free(neighbors1);
+                free(neighbors2);
+                free(labelsNbr);
+                return true;
+            }
+        }
+    }
+    free(neighbors1);
+    free(neighbors2);
+    free(labelsNbr);
+    return false;
+}
+
+int intersectionCount(int *arr1, int size1, int *arr2) {
+    int count = 0;
+    for(int i = 0; i < size1; i++) {
+        int vertex = arr1[i];
+        if(arr2[vertex] == 1) {
+            count++;
+        }
+    }
+    return count;
+}
+
+int* findNodesOfLabel(int* neighbors, Graph* g, int label, int maxSize, int* size) {
+    int* nodes = (int*)malloc(maxSize * sizeof(int));
+    
+    if (nodes == NULL) {
+        printf("Error allocating memory in findNodeOfLabel\n");
+        exit(EXIT_FAILURE);
+    }
+
+    *size = 0;
+    for(int i = 0; i < maxSize; i++) {
+        int v = neighbors[i];
+        if (g->nodesToLabel[v] == label) {
+            nodes[*size] = v;
+            *size = *size + 1;
+        }
+    }
+
+    return nodes;
+}
+
+bool checkLabels(Graph*g1, Graph*g2, int* neighbors1, int* neighbors2, int nbr1Size, int nbr2Size, int* labelsNbr) {
+    for(int i = 0; i < LABELS; i++) {
+        labelsNbr[i] = 0;
+    }
+
+    for(int i = 0; i < nbr1Size; i++) {
+        int nbr1 = neighbors1[i];
+        int labelNbr1 = g1->nodesToLabel[nbr1];
+        bool found = false;
+
+        for(int j = 0; j < nbr2Size; j++) {
+            int nbr2 = neighbors2[j];
+            int labelNbr2 = g2->nodesToLabel[nbr2];
+
+            if(labelNbr1 == labelNbr2)
+                found = true;
+                labelsNbr[labelNbr1] = 1;
+                break;
+        }
+
+        if (!found) {
+            return false;
+        }
+    }
+    // *labelSize = 0;
+    // for(int label = 0; label < LABELS; label++) {
+    //     if(labelsNbr[label] == 1) {
+    //         *labelSize = *labelSize + 1;
+    //     }
+    // }
+    return true;
+}
+
+int* findNeighbors(Graph* g, int node, int* size) {
+    int* neighbors = (int*)malloc(g->degrees[node] * sizeof(int));   // prima era maxDegree (in realta no). Se corretto puoi togleire il calcolo del maxDegree
+    
+    if(neighbors == NULL) {
+        printf("Error allocating memory in findNeighbors\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
+        if (g->matrix[node * g->numVertices + adjVertex] == 1) {
+            neighbors[*size] = adjVertex;
+            *size = *size + 1;
+        }
+    }
+    
+    return neighbors;
 }
 
 /***** QUEUE FUNCTIONS *****/
@@ -608,4 +996,88 @@ void freeQueue(Queue* q) {
     q = NULL;
 }
 
+/***** STACK FUNCTIONS *****/
+Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
+    Info* info = (Info*)malloc(sizeof(Info));
+    if (info == NULL) {
+        printf("Error allocating memory in createInfo\n");
+        exit(EXIT_FAILURE);
+    }
+    info->vertex = vertex;
+    info->candidates = candidates;
+    info->sizeCandidates = sizeCandidates;
+    return info;
+}
 
+StackNode* createStackNode(Info* info) {
+    StackNode* node = (StackNode*)malloc(sizeof(StackNode));
+    if (node == NULL) {
+        printf("Error allocating memory in createStackNode\n");
+        exit(EXIT_FAILURE);
+    }
+    node->info = info;
+    node->next = NULL;
+    return node;
+}
+
+void push(StackNode** top, int* candidates, int sizeCandidates, int vertex) {
+    Info* info = createInfo(candidates, sizeCandidates, vertex);
+    StackNode* node = createStackNode(info);
+    node->next = *top;
+    *top = node;
+}
+
+Info* pop(StackNode** top) {
+    if (isStackEmpty(*top)) {
+        printf("Stack is empty, cannot pop\n");
+        return NULL;
+    }
+    StackNode* node = *top;
+    Info* info = node->info;
+    *top = node->next;
+    free(node);
+    return info;
+}
+
+bool isStackEmpty(StackNode* top) {
+    return top == NULL;
+}
+
+void freeStack(StackNode* top) {
+    while (!isStackEmpty(top)) {
+        StackNode* node = top;
+        top = top->next;
+        freeInfo(node->info);
+        free(node);
+    }
+}
+
+void printStack(StackNode* top) {
+    StackNode* current = top;
+    while (current != NULL) {
+        printInfo(current->info);
+        current = current->next;
+    }
+}
+
+void printInfo(Info* info) {
+    printf("Vertex: %d\n", info->vertex);
+    printf("Candidates: ");
+    for (int i = 0; i < info->sizeCandidates; i++) {
+        printf("%d ", info->candidates[i]);
+    }
+    printf("\n");
+}
+
+void freeInfo(Info* info) {
+    free(info->candidates);
+    free(info);
+}
+
+StackNode* createStack() {
+    return NULL;
+}
+
+Info* peek(StackNode** top) {
+    return (*top)->info;
+}
