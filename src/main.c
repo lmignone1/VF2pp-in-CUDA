@@ -23,7 +23,7 @@ typedef struct {
     int *mapping2;  // mapping from target to query
     int *T1;        // Ti contains uncovered neighbors of covered nodes from Gi, i.e. nodes that are not in the mapping, but are neighbors of nodes that are.
     int *T2;        
-    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti
+    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti. Cioe nodi che non sono in mapping e non sono vicini di nodi coperti
     int* T2_out;
 } State;
 
@@ -38,6 +38,7 @@ typedef struct {
     int vertex;
     int* candidates;
     int sizeCandidates;
+    int candidateIndex;
 } Info;
 
 typedef struct StackNode {
@@ -61,6 +62,8 @@ State* createState(Graph*, Graph*);
 void freeState(State*);
 void printState(State*, int);
 bool isMappingFull(Graph*, State*);
+void updateState(Graph*, Graph*, State*, int, int);
+void restoreState(Graph*, Graph*, State*, int, int);
 
 /***** VF2++ PROTOTYPES *****/
 void vf2pp(Graph*, Graph*, State*);
@@ -108,6 +111,7 @@ int main() {
     printf("%s\n", FILENAME_TARGET);
     Graph* g2 = readGraph(FILENAME_TARGET);
     State* s = createState(g1, g2);
+    
     vf2pp(g1, g2, s);
     
     printf("\nMapping\n");
@@ -176,8 +180,8 @@ void addEdge(Graph* g, int src, int target) {
     g->matrix[target * g->numVertices + src] = 1;
     g->degrees[src]++;
     g->degrees[target]++;
-    int degree = g->degrees[src] > g->degrees[target] ? g->degrees[src] : g->degrees[target];
-    g->maxDegree = degree > g->maxDegree ? degree : g->maxDegree;
+    int degree = g->degrees[src] > g->degrees[target] ? g->degrees[src] : g->degrees[target];   // si possono rimuovere forse
+    g->maxDegree = degree > g->maxDegree ? degree : g->maxDegree;   // si possono rimuovere forse
 }
 
 Graph* createGraph() {
@@ -362,6 +366,86 @@ bool isMappingFull(Graph* g, State* state) {
         }
     }
     return true;
+}
+
+void updateState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
+    for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
+        
+        if(g1->matrix[node * g1->numVertices + adjVertex] == 1 && state->mapping1[adjVertex] == -1) {
+            state->T1[adjVertex] = 1;
+            state->T1_out[adjVertex] = -1;
+        }
+
+        if(g2->matrix[candidate * g2->numVertices + adjVertex] == 1 && state->mapping2[adjVertex] == -1) {
+            state->T2[adjVertex] = 1;
+            state->T2_out[adjVertex] = -1;
+        }
+    }
+
+    state->T1[node] = -1;
+    state->T1_out[node] = -1;
+    state->T2[candidate] = -1;
+    state->T2_out[candidate] = -1;
+}
+
+void restoreState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
+    bool isAdded = false;
+    for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
+        if(g1->matrix[node * g1->numVertices + adjVertex] == 1) {
+            
+            if(state->mapping1[adjVertex] == 1) {
+                state->T1[node] = 1;
+                isAdded = true;     // verificare se l operazione legata a questo falg possa essere spostata qui
+            }
+            else {
+                bool hasCoveredNeighbor = false;
+                for(int adjVertex2 = 0; adjVertex2 < g1->numVertices; adjVertex2++) {
+                    if(g1->matrix[adjVertex * g1->numVertices + adjVertex2] == 1 && state->mapping1[adjVertex2] == 1) {
+                        hasCoveredNeighbor = true;
+                        break;
+                    }
+                }
+
+                if(!hasCoveredNeighbor) {
+                    state->T1[adjVertex] = -1;
+                    state->T1_out[adjVertex] = 1;
+                }
+            }
+        }
+    }
+
+    if(!isAdded) {
+        state->T1_out[node] = 1;
+    }
+
+    isAdded = false;    
+    for(int adjVertex = 0; adjVertex < g2->numVertices; adjVertex++) {
+        if(g2->matrix[candidate * g2->numVertices + adjVertex] == 1) {
+            
+            if(state->mapping2[adjVertex] == 1) {
+                state->T2[candidate] = 1;
+                isAdded = true;
+            }
+            else {
+                bool hasCoveredNeighbor = false;
+                for(int adjVertex2 = 0; adjVertex2 < g2->numVertices; adjVertex2++) {
+                    if(g2->matrix[adjVertex * g2->numVertices + adjVertex2] == 1 && state->mapping2[adjVertex2] == 1) {
+                        hasCoveredNeighbor = true;
+                        break;
+                    }
+                }
+
+                if(!hasCoveredNeighbor) {
+                    state->T2[adjVertex] = -1;
+                    state->T2_out[adjVertex] = 1;
+                }
+            }
+        }
+    }
+    
+    if(!isAdded) {
+        state->T2_out[candidate] = 1;
+    }
 }
 
 /***** VF2++ FUNCTIONS *****/
@@ -624,6 +708,7 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
     }
     
     // B
+    printf("entro in B");
     int* commonNodes = (int*)malloc(g2->numVertices * sizeof(int));
     for(int i = 0; i < g2->numVertices; i++) {
         commonNodes[i] = 1;  
@@ -727,18 +812,19 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
 
 int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
     int* coveredNeighbors = (int*)malloc(g->degrees[node] * sizeof(int));   // possono essere al massimo maxDegreen (non vero)
-    
+    *size = 0;
+
     if(coveredNeighbors == NULL) {
         printf("Error allocating memory in findCoveredNeighbors\n");
         exit(EXIT_FAILURE);
     }
 
-    for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
+        for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
         if (g->matrix[node * g->numVertices + adjVertex] == 1 && state->mapping1[adjVertex] != -1) {
             coveredNeighbors[*size] = adjVertex;
-            *size = *size + 1;
+                *size = *size + 1;
+            }
         }
-    }
     
     return coveredNeighbors;
 }
@@ -750,7 +836,7 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
     }
 
     int* order = ordering(g1, g2);
-      
+    
     int sizeCandidates = 0;
     int* candidates = findCandidates(g1, g2, state, order[0], &sizeCandidates);
     
@@ -761,8 +847,9 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
         Info* info = peek(&stack);
         bool isMatch = false;
 
-        for(int i = 0; i < info->sizeCandidates; i++) {
+        for(int i = info->candidateIndex; i < info->sizeCandidates; i++) {
             int candidate = info->candidates[i];
+            info->candidateIndex = i + 1;
 
             if(!cutISO(g1, g2, state, info->vertex, candidate)) {
                 
@@ -775,7 +862,7 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
 
                 state->mapping1[info->vertex] = candidate;
                 state->mapping2[candidate] = info->vertex;
-                // update state
+                updateState(g1, g2, state, info->vertex, candidate);
                 candidates = findCandidates(g1, g2, state, order[matchingNode], &sizeCandidates);
                 push(&stack, candidates, sizeCandidates, order[matchingNode]);
                 matchingNode++;
@@ -796,7 +883,7 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
                 int candidate = state->mapping1[prevInfo->vertex];
                 state->mapping1[prevInfo->vertex] = -1;
                 state->mapping2[candidate] = -1;
-                // restore state
+                restoreState(g1, g2, state, prevInfo->vertex, candidate);
             }
         }
     }
@@ -1006,6 +1093,7 @@ Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
     info->vertex = vertex;
     info->candidates = candidates;
     info->sizeCandidates = sizeCandidates;
+    info->candidateIndex = 0;
     return info;
 }
 
@@ -1062,6 +1150,7 @@ void printStack(StackNode* top) {
 
 void printInfo(Info* info) {
     printf("Vertex: %d\n", info->vertex);
+    printf("Index seen: %d\n", info->candidateIndex);
     printf("Candidates: ");
     for (int i = 0; i < info->sizeCandidates; i++) {
         printf("%d ", info->candidates[i]);
