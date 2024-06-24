@@ -354,6 +354,7 @@ void printState(State* s, int numVertices) {
     }
 }
 
+// complexity is O(n)
 bool isMappingFull(Graph* g, State* state) {
     for(int i = 0; i < g->numVertices; i++) {
         if(state->mapping1[i] == -1) {
@@ -363,6 +364,7 @@ bool isMappingFull(Graph* g, State* state) {
     return true;
 }
 
+// complexity is O(n)
 void updateState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
         
@@ -388,6 +390,7 @@ void updateState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     // printf("\n");
 }
 
+// complexity is O(n^2)
 void restoreState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     bool isAdded = false;
     for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
@@ -455,6 +458,7 @@ void restoreState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
 }
 
 /***** VF2++ FUNCTIONS *****/
+// complexity is O(nlogn). LABELS are constant so it is O(1)
 bool checkGraphProperties(Graph* g1, Graph* g2) {
     if (g1->numVertices != g2->numVertices || g1->numVertices == 0 || g2->numVertices == 0) {
         return false;
@@ -473,6 +477,7 @@ bool checkGraphProperties(Graph* g1, Graph* g2) {
     return true;
 }
 
+// complexity is O(n)
 int* copyArray(int* arr, int size) {
     int* copy = (int*)malloc(size * sizeof(int));
     
@@ -488,6 +493,7 @@ int* copyArray(int* arr, int size) {
     return copy;
 }
 
+// complexity is O(nlogn) because of qsort
 bool checkSequenceDegree(int* degree1, int* degree2, int size) {
     int* tmp1 = copyArray(degree1, size);
     int* tmp2 = copyArray(degree2, size);
@@ -512,6 +518,7 @@ int compare(const void* a, const void* b) {
     return (*(int*)a - *(int*)b);
 }
 
+// complexity is O(n^4) -> O(n) + O(n^4)
 int* ordering(Graph* g1, Graph* g2) {
     int* order = (int*)malloc(g1->numVertices * sizeof(int));   // order of the nodes of g1
     int* labelRarity = copyArray(g1->labelsCardinalities, LABELS);  
@@ -523,16 +530,19 @@ int* ordering(Graph* g1, Graph* g2) {
         exit(EXIT_FAILURE);
     }
 
+    // O(n)
     for(int i = 0; i < g1->numVertices; i++) {
         connectivityG1[i] = 0;
         V1Unordered[i] = -1;
     }
 
+
+    // while is O(n) -> O(n*(n + n^2 + n^3) = O(n^4)
     int order_index = 0;
     while (order_index < g1->numVertices) {
         int maxRarity = INF;
         int maxNode = -1;
-        for (int vertex = 0; vertex < g1->numVertices; vertex++) {
+        for (int vertex = 0; vertex < g1->numVertices; vertex++) {  // O(n)
             if (V1Unordered[vertex] == -1) {
                 int rarity = labelRarity[g1->nodesToLabel[vertex]];
                 if (rarity < maxRarity) {
@@ -547,12 +557,13 @@ int* ordering(Graph* g1, Graph* g2) {
         }
         
         int maxDepth = 0;
-        int* levels = bfs(g1, maxNode, &maxDepth);
+        int* levels = bfs(g1, maxNode, &maxDepth);  // O(n^2)
         int* levelNodes = (int*)malloc((g1->numVertices) * sizeof(int));
 
+        // for is O(n*(n + n^2)) -> O(n^3)
         for (int depth = 0; depth <= maxDepth; depth++) {
-            int levelSize = findLevelNodes(g1, levels, levelNodes, depth);
-            processDepth(order, &order_index, g1, connectivityG1, labelRarity, V1Unordered, levelNodes, &levelSize);
+            int levelSize = findLevelNodes(g1, levels, levelNodes, depth);  // O(n)
+            processDepth(order, &order_index, g1, connectivityG1, labelRarity, V1Unordered, levelNodes, &levelSize); // O(L*(L+n)). Se L=n allora O(n^2)
         }
         free(levels);
         free(levelNodes);
@@ -564,6 +575,7 @@ int* ordering(Graph* g1, Graph* g2) {
     return order;
 }
 
+// complexity is O(n)
 int findLevelNodes(Graph* g, int* levels, int* levelNodes, int depth) {
     int i = 0;
     for(int vertex = 0; vertex < g->numVertices; vertex++) {
@@ -575,6 +587,7 @@ int findLevelNodes(Graph* g, int* levels, int* levelNodes, int depth) {
     return i;
 }
 
+// complexity is O(n^2). matrix is O(n) and while loop is O(n) -> O(n^2)
 int* bfs(Graph* g, int root, int* maxDepth) {
     int* levels = (int*)malloc(g->numVertices * sizeof(int));
 
@@ -609,6 +622,7 @@ int* bfs(Graph* g, int root, int* maxDepth) {
     return levels;
 }
 
+// complexity is O(L). There is the break statement so for are consecutive O(2L) -> O(L). L is the number of nodes in each levels (bfs)
 void removeElementArray(int* arr, int* size, int element) {
     for (int i = 0; i < *(size); i++) {
         if (arr[i] == element) {
@@ -621,6 +635,7 @@ void removeElementArray(int* arr, int* size, int element) {
     *size = *size - 1;
 }
 
+// complexity is O(L*(L+N)). First for is O(L) and second for is O(N). The while loop is O(L)
 void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, int* labelRarity, int* V1Unordered, int* levelNodes, int* levelSize) {
     while (*levelSize > 0) {
         int maxConnectivity = -INF;  
@@ -666,6 +681,7 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
     }
 }
 
+// complexity is O(n^2). If coveredNeighbors is empty then it is O(n) + O(L) -> O(n), L is the cardinality of the label l
 int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandidates) {  
     int coveredNeighborsSize = 0;
     int *coveredNeighbors = findCoveredNeighbors(g1, state, node, &coveredNeighborsSize);
@@ -705,6 +721,38 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
         commonNodes[i] = 1;  
     }
     
+    // // FATTO BENE ------------------------------------------------- DA RICONTROLLARE
+    // int degree = g1->degrees[node];
+    // int label = g1->nodesToLabel[node];
+
+    // int count = 0;
+    // for(int i = 0; i < coveredNeighborsSize; i++) {
+    //     int nbrG1 = coveredNeighbors[i];
+    //     int mappedG2 = state->mapping1[nbrG1];
+
+    //     for(int adjVertex = 0; adjVertex < g2->numVertices; adjVertex++) {
+    //         if(g2->matrix[mappedG2 * g2->numVertices + adjVertex] == 0 || state->mapping2[adjVertex] == 1  
+    //             g2->degrees[adjVertex] != degree || g2->nodesToLabel[adjVertex] != label) {
+    //             commonNodes[adjVertex] = 0;
+    //             count++;
+    //         }
+    //     }
+    // }
+    
+    // int candidatesSize = g2->numVertices - count;
+    // int* candidates = (int*)malloc(candidatesSize * sizeof(int));
+    
+    // *sizeCandidates = 0;
+    // for(int vertex; vertex < g2->numVertices; vertex++) {
+    //     if(commonNodes[vertex] == 1) {
+    //         candidates[*sizeCandidates] = vertex;
+    //         *sizeCandidates = *sizeCandidates + 1;
+    //     }
+    // }
+    
+    // ---------------------------------------------------------------ù
+
+    // THIS WORK BUT NO OPTIMIZED
     int count = 0;
     for(int i = 0; i < coveredNeighborsSize; i++) {
         int nbrG1 = coveredNeighbors[i];
@@ -797,6 +845,7 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
     return candidates;
 }
 
+// complexity is O(n)
 int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
     int* coveredNeighbors = (int*)malloc(g->degrees[node] * sizeof(int));   
     *size = 0;
@@ -816,38 +865,41 @@ int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
     return coveredNeighbors;
 }
 
+// the complexity is O(n!*n*(n^2)) -> O(n^3*n!)
 void vf2pp(Graph* g1, Graph* g2, State* state) {
-    if (!checkGraphProperties(g1, g2)) {
+    if (!checkGraphProperties(g1, g2)) {    // O(nlogn)
         printf("Graphs are not isomorphic\n");
         return;
     }
 
-    int* order = ordering(g1, g2);
+    int* order = ordering(g1, g2); // O(n^4)
     
-    printf("Order:\t");
-    for(int i = 0; i < g1->numVertices; i++) {
-        printf("%d ", order[i]);
-    }
-    printf("\n");
+    // printf("Order:\t");
+    // for(int i = 0; i < g1->numVertices; i++) {
+    //     printf("%d ", order[i]);
+    // }
+    // printf("\n");
 
     int sizeCandidates = 0;
-    int* candidates = findCandidates(g1, g2, state, order[0], &sizeCandidates);
+    int* candidates = findCandidates(g1, g2, state, order[0], &sizeCandidates); // O(n^2)
     
-    StackNode* stack = createStack(); 
-    push(&stack, candidates, sizeCandidates, order[0]);
+    StackNode* stack = createStack(); // O(1)
+    push(&stack, candidates, sizeCandidates, order[0]); // O(1)
     
+    // the while loop is O(n!) because the worst case is to examine all the possible permutations of the nodes. 
     int matchingNode = 1;
-    while (!isStackEmpty(stack)) {
-        Info* info = peek(&stack);
+    while (!isStackEmpty(stack)) {  // O(1)
+        Info* info = peek(&stack);  // O(1)
         bool isMatch = false;
         
         // printInfo(info);
         
+        // the for loop is O(n) because can be executed at most n times
         for(int i = info->candidateIndex; i < info->sizeCandidates; i++) {
             int candidate = info->candidates[i];
             info->candidateIndex = i + 1;
 
-            int ret = cutISO(g1, g2, state, info->vertex, candidate);
+            int ret = cutISO(g1, g2, state, info->vertex, candidate); // O(n^2)
 
             // printf("CutISO: %d\n", ret);
             // printf("\n");
@@ -859,16 +911,16 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
                 state->mapping1[info->vertex] = candidate;
                 state->mapping2[candidate] = info->vertex;
 
-                if(isMappingFull(g1, state)) {
-                    freeStack(stack);
+                if(isMappingFull(g1, state)) { // O(n)
+                    freeStack(stack); // O(size of stack)
                     free(order);
                     printf("Graphs are isomorphic\n");
                     return;
                 }
 
-                updateState(g1, g2, state, info->vertex, candidate);
-                candidates = findCandidates(g1, g2, state, order[matchingNode], &sizeCandidates);
-                push(&stack, candidates, sizeCandidates, order[matchingNode]);
+                updateState(g1, g2, state, info->vertex, candidate); // O(n)
+                candidates = findCandidates(g1, g2, state, order[matchingNode], &sizeCandidates);   // O(n^2)
+                push(&stack, candidates, sizeCandidates, order[matchingNode]);  // O(1)
                 matchingNode++;
                 isMatch = true;
                 break;
@@ -877,29 +929,30 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
 
         // no more candidates
         if(!isMatch) {
-            Info* tmp = pop(&stack);
-            freeInfo(tmp);
+            Info* tmp = pop(&stack);    // O(1)
+            freeInfo(tmp);  // O(1)
             matchingNode--;
 
             // backtracking
-            if(!isStackEmpty(stack)) {
-                Info* prevInfo = peek(&stack);
+            if(!isStackEmpty(stack)) {  // O(1)
+                Info* prevInfo = peek(&stack);  // O(1)
                 int candidate = state->mapping1[prevInfo->vertex];
                 state->mapping1[prevInfo->vertex] = -1;
                 state->mapping2[candidate] = -1;
-                restoreState(g1, g2, state, prevInfo->vertex, candidate);
+                restoreState(g1, g2, state, prevInfo->vertex, candidate); // O(n^2)
             }
         }
     }
     free(order);
-    freeStack(stack);
+    freeStack(stack); // O(size of stack)
 }
 
+// complexity is O(n^2)
 bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     // printf("\nCutISO node1 %d e node2 %d\n", node1, node2);
 
     int nbrSize1 = 0, nbrSize2 = 0;
-    int* neighbors1 = findNeighbors(g1, node1, &nbrSize1);
+    int* neighbors1 = findNeighbors(g1, node1, &nbrSize1); // O(n)
 
     // printf("Neighbors1 of node1 %d: ", node1);
     // for(int i = 0; i < nbrSize1; i++) {
@@ -907,7 +960,7 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     // }
     // printf("\n");
 
-    int* neighbors2 = findNeighbors(g2, node2, &nbrSize2);
+    int* neighbors2 = findNeighbors(g2, node2, &nbrSize2); // O(n)
 
     // printf("Neighbors2 of node2 %d: ", node2);
     // for(int i = 0; i < nbrSize2; i++) {
@@ -922,6 +975,7 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
         exit(EXIT_FAILURE);
     }
 
+    // O(n^2)
     bool result = checkLabels(g1, g2, neighbors1, neighbors2, nbrSize1, nbrSize2, labelsNbr); // check if labels are the same
     
     // printf("CheckLabels: %d\n", result);
@@ -943,8 +997,9 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
 
     // in this case labels are the same
     // check if the number of neighbors with the same label in G1 and G2 are the same
+    // for is O(1) * O(n) -> O(n)
     for(int label = 0; label < LABELS; label++) {
-        if (labelsNbr[label] == 1) {    // if the label effectively the same
+        if (labelsNbr[label] == 1) {    // if the label is effectively the same
             int G1NodesOfLabelSize = 0;
             int* G1NodesOfLabel = findNodesOfLabel(neighbors1, g1, label, nbrSize1, &G1NodesOfLabelSize);
             int G2NodesOfLabelSize = 0;
@@ -972,6 +1027,7 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     return false;
 }
 
+// complexity is O(size1) where size1 is nbrSize1 or nbrSize2 -> O(n)
 int intersectionCount(int *arr1, int size1, int *arr2) {
     int count = 0;
     for(int i = 0; i < size1; i++) {
@@ -983,6 +1039,7 @@ int intersectionCount(int *arr1, int size1, int *arr2) {
     return count;
 }
 
+// complexity is O(maxSize) where maxSize is #neighbors of node (degree) -> O(n)
 int* findNodesOfLabel(int* neighbors, Graph* g, int label, int maxSize, int* size) {
     int* nodes = (int*)malloc(maxSize * sizeof(int));
     
@@ -1003,6 +1060,7 @@ int* findNodesOfLabel(int* neighbors, Graph* g, int label, int maxSize, int* siz
     return nodes;
 }
 
+// complexity is O(nbr1Size*nbr2Size) -> O(n^2) 
 bool checkLabels(Graph*g1, Graph*g2, int* neighbors1, int* neighbors2, int nbr1Size, int nbr2Size, int* labelsNbr) {
     for(int i = 0; i < LABELS; i++) {
         labelsNbr[i] = 0;
@@ -1032,6 +1090,7 @@ bool checkLabels(Graph*g1, Graph*g2, int* neighbors1, int* neighbors2, int nbr1S
     return true;
 }
 
+// complexity is O(n)
 int* findNeighbors(Graph* g, int node, int* size) {
     int* neighbors = (int*)malloc(g->degrees[node] * sizeof(int));  
     
@@ -1051,6 +1110,7 @@ int* findNeighbors(Graph* g, int node, int* size) {
 }
 
 /***** QUEUE FUNCTIONS *****/
+// complexity is O(capacity)
 Queue* createQueue(int capacity) {
     Queue* q = (Queue*)malloc(sizeof(Queue));
     q->data = (int*)malloc(capacity * sizeof(int));
@@ -1066,10 +1126,12 @@ Queue* createQueue(int capacity) {
     return q;
 }
 
+// complexity is O(1)
 bool isQueueEmpty(Queue* q) {
     return q->head == -1;
 }
 
+// complexity is O(2*capaicty)
 void resizeQueue(Queue* q) {
     q->capacity *= 2;
     q->data = (int*)realloc(q->data, q->capacity * sizeof(int));
@@ -1080,6 +1142,7 @@ void resizeQueue(Queue* q) {
     }
 }
 
+// complexity ammortized O(1)
 void enqueue(Queue* q, int item) {
     if (q->tail == q->capacity - 1) {
         resizeQueue(q);
@@ -1091,6 +1154,7 @@ void enqueue(Queue* q, int item) {
     q->data[q->tail] = item;
 }
 
+// complexity is O(1)
 int dequeue(Queue* q) {
     if (isQueueEmpty(q)) {
         return -1;
@@ -1105,6 +1169,7 @@ int dequeue(Queue* q) {
     }
 }
 
+// complexity is O(1)
 void freeQueue(Queue* q) {
     free(q->data);
     free(q);
@@ -1112,6 +1177,7 @@ void freeQueue(Queue* q) {
 }
 
 /***** STACK FUNCTIONS *****/
+// complexity is O(1)
 Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
     Info* info = (Info*)malloc(sizeof(Info));
     if (info == NULL) {
@@ -1125,6 +1191,7 @@ Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
     return info;
 }
 
+// complexity is O(1)
 StackNode* createStackNode(Info* info) {
     StackNode* node = (StackNode*)malloc(sizeof(StackNode));
     if (node == NULL) {
@@ -1136,6 +1203,7 @@ StackNode* createStackNode(Info* info) {
     return node;
 }
 
+// complexity is O(1)
 void push(StackNode** top, int* candidates, int sizeCandidates, int vertex) {
     Info* info = createInfo(candidates, sizeCandidates, vertex);
     StackNode* node = createStackNode(info);
@@ -1143,6 +1211,7 @@ void push(StackNode** top, int* candidates, int sizeCandidates, int vertex) {
     *top = node;
 }
 
+// complexity is O(1)
 Info* pop(StackNode** top) {
     if (isStackEmpty(*top)) {
         printf("Stack is empty, cannot pop\n");
@@ -1155,10 +1224,12 @@ Info* pop(StackNode** top) {
     return info;
 }
 
+// complexity is O(1)
 bool isStackEmpty(StackNode* top) {
     return top == NULL;
 }
 
+// complexity is O(size of stack)
 void freeStack(StackNode* top) {
     while (!isStackEmpty(top)) {
         StackNode* node = top;
@@ -1186,15 +1257,18 @@ void printInfo(Info* info) {
     printf("\n");
 }
 
+// complexity is O(1)
 void freeInfo(Info* info) {
     free(info->candidates);
     free(info);
 }
 
+// complexity is O(1)
 StackNode* createStack() {
     return NULL;
 }
 
+// complexity is O(1)
 Info* peek(StackNode** top) {
     return (*top)->info;
 }
