@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define FILENAME_QUERY "../data/graph_query.csv"
-#define FILENAME_TARGET "../data/graph_target.csv"
+#define FILENAME_QUERY "../../data/graph_query.csv"
+#define FILENAME_TARGET "../../data/graph_target.csv"
 #define LABELS 10
 #define INF 99999
 
