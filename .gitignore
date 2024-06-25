@@ -1,5 +1,5 @@
 *.a
 *.o
 .tips
-p.c
-commonNodes.c
+.tmp.driveupload
+.tmp.drivedownload

@@ -3,10 +3,10 @@ import networkx as nx
 import csv
 import os
 
-FILENAME1 = "graph_query.csv"
-FILENAME2 = "graph_target.csv"
+NODES = 5000
+FILENAME1 = f"graph_query_{NODES}.csv"
+FILENAME2 = f"graph_target_{NODES}.csv"
 LABELS = 10
-NODES = 10
 
 # Function to save graph to CSV
 def save_graph_to_csv(graph, filename):

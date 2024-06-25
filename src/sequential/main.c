@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define FILENAME_QUERY "../../data/graph_query.csv"
-#define FILENAME_TARGET "../../data/graph_target.csv"
+#define FILENAME_QUERY "../../data/graph_query_10.csv"
+#define FILENAME_TARGET "../../data/graph_target_10.csv"
 #define LABELS 10
 #define INF 99999
 
@@ -771,6 +771,7 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
     }
 
     commonNodesSize = commonNodesSize - count;
+    
     // printf("fourth common nodes size is %d and are\n", commonNodesSize);
     // for(int i = 0; i < g2->numVertices; i++) {
     //     printf("%d ", commonNodes[i]);
