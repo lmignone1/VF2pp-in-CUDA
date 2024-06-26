@@ -166,7 +166,7 @@ void initGraph(Graph* g) {
 
     for (int label = 0; label < LABELS; label++) {
         g->labelsCardinalities[label] = 0;
-        g->labelToNodes[label] = malloc(g->numVertices * sizeof(int));
+        g->labelToNodes[label] = (int*)malloc(g->numVertices * sizeof(int));
     }
 }
 
@@ -819,17 +819,16 @@ int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
 
 void vf2pp(Graph* g1, Graph* g2, State* state) {
     if (!checkGraphProperties(g1, g2)) {
-        printf("Graphs are not isomorphic\n");
         return;
     }
 
     int* order = ordering(g1, g2);
     
-    printf("Order:\t");
-    for(int i = 0; i < g1->numVertices; i++) {
-        printf("%d ", order[i]);
-    }
-    printf("\n");
+    // printf("Order:\t");
+    // for(int i = 0; i < g1->numVertices; i++) {
+    //     printf("%d ", order[i]);
+    // }
+    // printf("\n");
 
     int sizeCandidates = 0;
     int* candidates = findCandidates(g1, g2, state, order[0], &sizeCandidates);
