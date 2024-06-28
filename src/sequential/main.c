@@ -46,7 +46,6 @@ typedef struct StackNode {
 } StackNode;
 
 /***** GRAPH PROTOTYPES *****/
-int* createAdjMatrix(int);
 void initGraph(Graph*);
 Graph* createGraph();
 void addEdge(Graph*, int, int);
@@ -54,7 +53,6 @@ Graph* readGraph(char*);
 void printGraph(Graph*);
 void freeGraph(Graph*);
 void setLabel(Graph*, int, int);
-int* labelsCardinalities(int);
 
 /***** STATE PROTOTYPES *****/
 State* createState(Graph*, Graph*);
@@ -130,31 +128,14 @@ int main() {
 }
 
 /***** GRAPH FUNCTIONS *****/
-
-int* createAdjMatrix(int numVertices) {
-    int* matrix = (int*)malloc(numVertices * numVertices * sizeof(int));
-    
-    if (matrix == NULL) {
-        printf("Error allocating memory in createAdjMatrix\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < numVertices; i++) {
-        for (int j = 0; j < numVertices; j++) {
-            matrix[i * numVertices + j] = 0;
-        }
-    }
-    
-    return matrix;
-}
-
 void initGraph(Graph* g) {
+    g->matrix = (int*)malloc(g->numVertices * g->numVertices * sizeof(int));
     g->nodesToLabel = (int*)malloc(g->numVertices * sizeof(int));
     g->labelsCardinalities = (int*)malloc(LABELS * sizeof(int));
     g->labelToNodes = (int**)malloc(LABELS * sizeof(int*));
     g->degrees = (int*)malloc(g->numVertices * sizeof(int));
 
-    if (g->nodesToLabel == NULL || g->labelsCardinalities == NULL || g->labelToNodes == NULL || g->degrees == NULL) {
+    if (g->nodesToLabel == NULL || g->labelsCardinalities == NULL || g->labelToNodes == NULL || g->degrees == NULL || g->matrix == NULL) {
         printf("Error allocating memory in initGraph\n");
         exit(EXIT_FAILURE);
     }
@@ -162,6 +143,10 @@ void initGraph(Graph* g) {
     for (int vertex = 0; vertex < g->numVertices; vertex++) {
         g->nodesToLabel[vertex] = -1;
         g->degrees[vertex] = 0;
+
+        for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
+            g->matrix[vertex * g->numVertices + adjVertex] = 0;
+        }
     }
 
     for (int label = 0; label < LABELS; label++) {
@@ -217,7 +202,6 @@ Graph* readGraph(char* path) {
     sscanf(line, "%*s%*s%*s%d", &g->numVertices);
     fgets(line, sizeof(line), f); // skip the header
 
-    g->matrix = createAdjMatrix(g->numVertices);
     initGraph(g);
 
     while (fgets(line, sizeof(line), f)) {
