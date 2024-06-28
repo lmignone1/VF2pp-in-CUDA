@@ -22,7 +22,7 @@ typedef struct {
     int *mapping2;  // mapping from target to query
     int *T1;        // Ti contains uncovered neighbors of covered nodes from Gi, i.e. nodes that are not in the mapping, but are neighbors of nodes that are.
     int *T2;        
-    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti. Cioe nodi che non sono in mapping e non sono vicini di nodi coperti
+    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti. Cioe nodi che non sono in mapping e sono vicini di nodi non coperti
     int* T2_out;
 } State;
 
@@ -377,14 +377,14 @@ void restoreState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
         if(g1->matrix[node * g1->numVertices + adjVertex] == 1) {
             
-            if(state->mapping1[adjVertex] == 1) {
+            if(state->mapping1[adjVertex] != -1) {
                 state->T1[node] = 1;
                 isAdded = true;     
             }
             else {
                 bool hasCoveredNeighbor = false;
                 for(int adjVertex2 = 0; adjVertex2 < g1->numVertices; adjVertex2++) {
-                    if(g1->matrix[adjVertex * g1->numVertices + adjVertex2] == 1 && state->mapping1[adjVertex2] == 1) {
+                    if(g1->matrix[adjVertex * g1->numVertices + adjVertex2] == 1 && state->mapping1[adjVertex2] != -1) {
                         hasCoveredNeighbor = true;
                         break;
                     }
@@ -406,14 +406,14 @@ void restoreState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     for(int adjVertex = 0; adjVertex < g2->numVertices; adjVertex++) {
         if(g2->matrix[candidate * g2->numVertices + adjVertex] == 1) {
             
-            if(state->mapping2[adjVertex] == 1) {
+            if(state->mapping2[adjVertex] != -1) {
                 state->T2[candidate] = 1;
                 isAdded = true;
             }
             else {
                 bool hasCoveredNeighbor = false;
                 for(int adjVertex2 = 0; adjVertex2 < g2->numVertices; adjVertex2++) {
-                    if(g2->matrix[adjVertex * g2->numVertices + adjVertex2] == 1 && state->mapping2[adjVertex2] == 1) {
+                    if(g2->matrix[adjVertex * g2->numVertices + adjVertex2] == 1 && state->mapping2[adjVertex2] != -1) {
                         hasCoveredNeighbor = true;
                         break;
                     }
