@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define FILENAME_QUERY "../../data/graph_query_10.csv"
 #define FILENAME_TARGET "../../data/graph_target_10.csv"
@@ -68,11 +69,9 @@ bool checkGraphProperties(Graph*, Graph*);
 bool checkSequenceDegree(int*, int*, int);
 int compare(const void*, const void*);
 int* ordering(Graph*, Graph*);
-int* copyArray(int*, int);
 int* bfs(Graph*, int, int*);
 int findLevelNodes(Graph*, int*, int*, int);
-void removeElementArray(int*, int*, int);
-void processDepth(int*, int*, Graph*, int*, int*, int*, int*, int*);
+void processDepth(int*, int*, Graph*, int*, int*, int*, int*, int);
 int* findCoveredNeighbors(Graph*, State*, int, int*);
 int* findCandidates(Graph*, Graph*, State*, int, int*);
 int intersectionCount(int*, int, int*);
@@ -457,24 +456,12 @@ bool checkGraphProperties(Graph* g1, Graph* g2) {
     return true;
 }
 
-int* copyArray(int* arr, int size) {
-    int* copy = (int*)malloc(size * sizeof(int));
-    
-    if (copy == NULL) {
-        printf("Error allocating memory in copyArray\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < size; i++) {
-        copy[i] = arr[i];
-    }
-
-    return copy;
-}
-
 bool checkSequenceDegree(int* degree1, int* degree2, int size) {
-    int* tmp1 = copyArray(degree1, size);
-    int* tmp2 = copyArray(degree2, size);
+    int* tmp1 = (int*)malloc(size * sizeof(int));
+    int* tmp2 = (int*)malloc(size * sizeof(int));
+
+    memcpy(tmp1, degree1, size * sizeof(int));
+    memcpy(tmp2, degree2, size * sizeof(int));
 
     qsort(tmp1, size, sizeof(int), compare);
     qsort(tmp2, size, sizeof(int), compare);
@@ -498,7 +485,7 @@ int compare(const void* a, const void* b) {
 
 int* ordering(Graph* g1, Graph* g2) {
     int* order = (int*)malloc(g1->numVertices * sizeof(int));   // order of the nodes of g1
-    int* labelRarity = copyArray(g1->labelsCardinalities, LABELS);  
+    int* labelRarity = (int*)malloc(LABELS * sizeof(int)); 
     int* connectivityG1 = (int*)malloc(g1->numVertices * sizeof(int));   // number of neighbors already ordered
     int* V1Unordered = (int*)malloc(g1->numVertices * sizeof(int));    // V1Unordered[i] = -1 if node has not been ordered yet else 1 
 
@@ -507,40 +494,41 @@ int* ordering(Graph* g1, Graph* g2) {
         exit(EXIT_FAILURE);
     }
 
+    memcpy(labelRarity, g1->labelsCardinalities, LABELS * sizeof(int)); 
+
     for(int i = 0; i < g1->numVertices; i++) {
         connectivityG1[i] = 0;
         V1Unordered[i] = -1;
     }
 
-    int order_index = 0;
-    while (order_index < g1->numVertices) {
-        int maxRarity = INF;
-        int maxNode = -1;
-        for (int vertex = 0; vertex < g1->numVertices; vertex++) {
-            if (V1Unordered[vertex] == -1) {
-                int rarity = labelRarity[g1->nodesToLabel[vertex]];
-                if (rarity < maxRarity) {
-                    maxRarity = rarity;
+    int maxRarity = INF;
+    int maxNode = -1;
+    for (int vertex = 0; vertex < g1->numVertices; vertex++) {
+        if (V1Unordered[vertex] == -1) {
+            int rarity = labelRarity[g1->nodesToLabel[vertex]];
+            if (rarity < maxRarity) {
+                maxRarity = rarity;
+                maxNode = vertex;
+            } else if (rarity == maxRarity) {
+                if (g1->degrees[vertex] > g1->degrees[maxNode]) {
                     maxNode = vertex;
-                } else if (rarity == maxRarity) {
-                    if (g1->degrees[vertex] > g1->degrees[maxNode]) {
-                        maxNode = vertex;
-                    }
                 }
             }
         }
-        
-        int maxDepth = 0;
-        int* levels = bfs(g1, maxNode, &maxDepth);
-        int* levelNodes = (int*)malloc((g1->numVertices) * sizeof(int));
+    }
+    
+    int maxDepth = 0;
+    int* levels = bfs(g1, maxNode, &maxDepth);
+    int* levelNodes = (int*)malloc((g1->numVertices) * sizeof(int));
+    int order_index = 0;
 
-        for (int depth = 0; depth <= maxDepth; depth++) {
-            int levelSize = findLevelNodes(g1, levels, levelNodes, depth);
-            processDepth(order, &order_index, g1, connectivityG1, labelRarity, V1Unordered, levelNodes, &levelSize);
-        }
-        free(levels);
-        free(levelNodes);
-    }           
+    for (int depth = 0; depth <= maxDepth; depth++) {
+        int levelSize = findLevelNodes(g1, levels, levelNodes, depth);
+        processDepth(order, &order_index, g1, connectivityG1, labelRarity, V1Unordered, levelNodes, levelSize);
+    }
+    free(levels);
+    free(levelNodes);
+            
     free(labelRarity);
     free(connectivityG1);
     free(V1Unordered);
@@ -593,27 +581,22 @@ int* bfs(Graph* g, int root, int* maxDepth) {
     return levels;
 }
 
-void removeElementArray(int* arr, int* size, int element) {
-    for (int i = 0; i < *(size); i++) {
-        if (arr[i] == element) {
-            for (int j = i; j < *(size) - 1; j++) {
-                arr[j] = arr[j + 1];
-            }
-            break;
-        }
-    }
-    *size = *size - 1;
-}
-
-void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, int* labelRarity, int* V1Unordered, int* levelNodes, int* levelSize) {
-    while (*levelSize > 0) {
+void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, int* labelRarity, int* V1Unordered, int* levelNodes, int levelSize) {
+    int l = levelSize;
+    
+    while (levelSize > 0) {
         int maxConnectivity = -INF;  
         int maxDegree = -INF;
         int maxRarity = INF;
         int nextNode = -1;
-
-        for(int i = 0; i < *levelSize; i++) {
+    
+        for(int i = 0; i < l; i++) {
             int vertex = levelNodes[i];
+
+            if (V1Unordered[vertex] == 1) {
+                continue;
+            }
+
             int conn = connectivityG1[vertex];
             if (conn > maxConnectivity) {
                 maxConnectivity = conn;
@@ -644,7 +627,7 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
             }
         }
         
-        removeElementArray(levelNodes, levelSize, nextNode);
+        levelSize--;
         labelRarity[g->nodesToLabel[nextNode]]--;
         V1Unordered[nextNode] = 1;
     }
