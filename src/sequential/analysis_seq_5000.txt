@@ -3,27 +3,27 @@ Flat profile:
 Each sample counts as 0.01 seconds.
   %   cumulative   self              self     total           
  time   seconds   seconds    calls   s/call   s/call  name    
- 98.65    246.35   246.35     5000     0.05     0.05  findCandidates
-  0.38    247.31     0.96   100000     0.00     0.00  findNodesOfLabel
-  0.20    247.82     0.51     5000     0.00     0.00  checkLabels
-  0.17    248.24     0.42    10000     0.00     0.00  findNeighbors
-  0.16    248.63     0.39     4999     0.00     0.00  updateState
-  0.12    248.92     0.29     5000     0.00     0.00  findCoveredNeighbors
-  0.09    249.14     0.22        2     0.11     0.11  createAdjMatrix
+ 98.65    246.35   246.35     5000     0.05     0.05  findCandidates  done
+  0.38    247.31     0.96   100000     0.00     0.00  findNodesOfLabel done
+  0.20    247.82     0.51     5000     0.00     0.00  checkLabels done
+  0.17    248.24     0.42    10000     0.00     0.00  findNeighbors done 
+  0.16    248.63     0.39     4999     0.00     0.00  updateState done
+  0.12    248.92     0.29     5000     0.00     0.00  findCoveredNeighbors done
+  0.09    249.14     0.22        2     0.11     0.11  createAdjMatrix deleted
   0.08    249.35     0.21        3     0.07     0.08  processDepth
   0.07    249.52     0.17        1     0.17     0.17  bfs
   0.06    249.67     0.15 13752148     0.00     0.00  addEdge
-  0.05    249.80     0.13   200000     0.00     0.00  intersectionCount
+  0.05    249.80     0.13   200000     0.00     0.00  intersectionCount done
   0.02    249.84     0.04 27504296     0.00     0.00  setLabel
   0.02    249.88     0.04        2     0.02     0.24  readGraph
-  0.01    249.91     0.03     5000     0.00     0.00  removeElementArray
+  0.01    249.91     0.03     5000     0.00     0.00  removeElementArray deleted
   0.01    249.93     0.02        2     0.01     0.01  initGraph
   0.00    249.94     0.01     5000     0.00     0.00  peek
   0.00    249.94     0.00    15001     0.00     0.00  isQueueEmpty
   0.00    249.94     0.00    10001     0.00     0.00  isStackEmpty
   0.00    249.94     0.00     5000     0.00     0.00  createInfo
   0.00    249.94     0.00     5000     0.00     0.00  createStackNode
-  0.00    249.94     0.00     5000     0.00     0.00  cutISO
+  0.00    249.94     0.00     5000     0.00     0.00  cutISO done
   0.00    249.94     0.00     5000     0.00     0.00  dequeue
   0.00    249.94     0.00     5000     0.00     0.00  enqueue
   0.00    249.94     0.00     5000     0.00     0.00  freeInfo

@@ -504,15 +504,13 @@ int* ordering(Graph* g1, Graph* g2) {
     int maxRarity = INF;
     int maxNode = -1;
     for (int vertex = 0; vertex < g1->numVertices; vertex++) {
-        if (V1Unordered[vertex] == -1) {
-            int rarity = labelRarity[g1->nodesToLabel[vertex]];
-            if (rarity < maxRarity) {
-                maxRarity = rarity;
+        int rarity = labelRarity[g1->nodesToLabel[vertex]];
+        if (rarity < maxRarity) {
+            maxRarity = rarity;
+            maxNode = vertex;
+        } else if (rarity == maxRarity) {
+            if (g1->degrees[vertex] > g1->degrees[maxNode]) {
                 maxNode = vertex;
-            } else if (rarity == maxRarity) {
-                if (g1->degrees[vertex] > g1->degrees[maxNode]) {
-                    maxNode = vertex;
-                }
             }
         }
     }
