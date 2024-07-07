@@ -1,6 +1,9 @@
 #ifndef GRAPH_LIST_H
 #define GRAPH_LIST_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -27,4 +30,8 @@ void printGraph(Graph*);
 void freeGraph(Graph*);
 Graph* readGraph(char*);
 
-#endif 
+#ifdef __cplusplus
+}
+#endif
+
+#endif
