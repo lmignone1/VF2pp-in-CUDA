@@ -91,7 +91,7 @@ void freeQueue(Queue*);
 /***** STACK PROTOTYPES *****/
 Info* createInfo(int* candidates, int sizeCandidates, int vertex);
 StackNode* createStackNode(Info*);
-void push(StackNode**, int*, int, int);
+void push(StackNode**, Info*);
 Info* pop(StackNode**);
 bool isStackEmpty(StackNode*);
 void freeStack(StackNode*);
@@ -799,7 +799,8 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
     int* candidates = findCandidates(g1, g2, state, order[0], &sizeCandidates);
     
     StackNode* stack = createStack(); 
-    push(&stack, candidates, sizeCandidates, order[0]);
+    Info* info = createInfo(candidates, sizeCandidates, order[0]);
+    push(&stack, info);
     
     int matchingNode = 1;
     while (!isStackEmpty(stack)) {
@@ -833,7 +834,8 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
 
                 updateState(g1, g2, state, info->vertex, candidate);
                 candidates = findCandidates(g1, g2, state, order[matchingNode], &sizeCandidates);
-                push(&stack, candidates, sizeCandidates, order[matchingNode]);
+                Info* info = createInfo(candidates, sizeCandidates, order[matchingNode]);
+                push(&stack, info);
                 matchingNode++;
                 isMatch = true;
                 break;
@@ -1084,7 +1086,7 @@ Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
         exit(EXIT_FAILURE);
     }
     info->vertex = vertex;
-    info->candidates = candidates;
+    info->candidates = (int*)realloc(candidates, sizeCandidates * sizeof(int));
     info->sizeCandidates = sizeCandidates;
     info->candidateIndex = 0;
     return info;
@@ -1101,8 +1103,7 @@ StackNode* createStackNode(Info* info) {
     return node;
 }
 
-void push(StackNode** top, int* candidates, int sizeCandidates, int vertex) {
-    Info* info = createInfo(candidates, sizeCandidates, vertex);
+void push(StackNode** top, Info* info) {    
     StackNode* node = createStackNode(info);
     node->next = *top;
     *top = node;
