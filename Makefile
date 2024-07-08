@@ -3,7 +3,6 @@ CC = gcc
 
 # Flags
 CFLAGS = -c
-LDFLAGS =
 
 # Directory dei sorgenti e degli oggetti
 SRC_DIR = src/lib
@@ -17,7 +16,7 @@ SEQ_FILES = main.c
 OBJS = $(SRC_DIR)/stack.o $(SRC_DIR)/queue.o $(SRC_DIR)/graph.o $(SRC_DIR)/state.o $(SEQ_DIR)/main.o
 
 # Target eseguibile
-EXEC = main
+EXEC = vf2pp_sequential
 
 # Regola per compilare tutti i file oggetto
 all: $(EXEC)
@@ -35,5 +34,3 @@ $(EXEC): $(OBJS)
 # Pulizia
 clean:
 	rm -f $(OBJS) $(EXEC)
-
-.PHONY: all clean

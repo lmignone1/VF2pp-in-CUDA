@@ -8,8 +8,8 @@
 #include "../lib/graph.h"
 #include "../lib/state.h"
 
-#define FILENAME_QUERY "data/graph_query_example.csv"
-#define FILENAME_TARGET "data/graph_target_example.csv"
+#define PATH_QUERY "data/graph_query_%d.csv"
+#define PATH_TARGET "data/graph_target_%d.csv"
 #define INF 99999
 
 void vf2pp(Graph*, Graph*, State*);
@@ -28,11 +28,17 @@ bool cutISO(Graph*, Graph*, State*, int, int);
 int* findNeighbors(Graph*, int, int*);
 bool checkLabels(Graph*, Graph*, int*, int*, int, int, int*);
 
-int main() {
-    // printf("%s\n", FILENAME_QUERY);
-    Graph* g1 = readGraph(FILENAME_QUERY);
-    // printf("%s\n", FILENAME_TARGET);
-    Graph* g2 = readGraph(FILENAME_TARGET);
+int main(int argc, char* argv[]) {
+    int V = atoi(argv[1]); // number of vertices
+    int D = atoi(argv[2]);  // degree
+    
+    char path1[256];
+    char path2[256];
+    sprintf(path1, PATH_QUERY, V);
+    sprintf(path2, PATH_TARGET, V);
+
+    Graph* g1 = readGraph(path1);
+    Graph* g2 = readGraph(path2);
     State* s = createState(g1, g2);
 
     // printf("\n");
