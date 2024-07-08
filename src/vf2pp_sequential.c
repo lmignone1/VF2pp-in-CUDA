@@ -270,7 +270,7 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
         *sizeCandidates = 0;
         for(int i = 0; i < maxSizeCandidates; i++) {
             int vertex = g2->labelToNodes[label][i];  // g2->labelToNodes[label] is a list of candidates
-            if(g2->degrees[vertex] == g1->degrees[node] && state->T2_out[vertex] == 1 && state->mapping2[vertex] != 1) {
+            if(g2->degrees[vertex] == g1->degrees[node] && state->T2_out[vertex] == 1 && state->mapping2[vertex] == -1) {
                 candidates[*sizeCandidates] = vertex;
                 *sizeCandidates = *sizeCandidates + 1;
             }
@@ -315,7 +315,7 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
     count = 0;
     for(int vertex = 0; vertex < g2->numVertices; vertex++) {
        
-        if(commonNodes[vertex] == 1 && state->mapping2[vertex] == 1) {
+        if(commonNodes[vertex] == 1 && state->mapping2[vertex] != -1) {
             commonNodes[vertex] = 0;
             count++;
         }
