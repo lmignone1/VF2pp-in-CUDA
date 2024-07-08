@@ -3,10 +3,10 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "../lib/stack.h"
-#include "../lib/queue.h"
-#include "../lib/graph.h"
-#include "../lib/state.h"
+#include "lib/stack.h"
+#include "lib/queue.h"
+#include "lib/graph.h"
+#include "lib/state.h"
 
 #define PATH_QUERY "data/graph_query_%d.csv"
 #define PATH_TARGET "data/graph_target_%d.csv"

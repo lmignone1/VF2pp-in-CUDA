@@ -1,33 +1,30 @@
-# Compilatore
+# compiler
 CC = gcc
 
 # Flags
 CFLAGS = -c
 
-# Directory dei sorgenti e degli oggetti
-SRC_DIR = src/lib
-SEQ_DIR = src/sequential
+# Directorries
+LIB_DIR = src/lib
+SRC_DIR = src
 
-# File sorgenti
-SRC_FILES = stack.c queue.c graph.c state.c
-SEQ_FILES = main.c
-
-# File oggetto
-OBJS = $(SRC_DIR)/stack.o $(SRC_DIR)/queue.o $(SRC_DIR)/graph.o $(SRC_DIR)/state.o $(SEQ_DIR)/main.o
-
-# Target eseguibile
+# Target
 EXEC = vf2pp_sequential
 
-# Regola per compilare tutti i file oggetto
+# object files
+OBJS = $(LIB_DIR)/stack.o $(LIB_DIR)/queue.o $(LIB_DIR)/graph.o $(LIB_DIR)/state.o $(SRC_DIR)/$(EXEC).o
+
+# rule for compiling files
 all: $(EXEC)
 
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
+# command for object files
+$(LIB_DIR)/%.o: $(LIB_DIR)/%.c
 	$(CC) $(CFLAGS) $< -o $@
 
-$(SEQ_DIR)/main.o: $(SEQ_DIR)/main.c
+$(SRC_DIR)/$(EXEC).o: $(SRC_DIR)/$(EXEC).c
 	$(CC) $(CFLAGS) $< -o $@
 
-# Regola per creare l'eseguibile
+# command for executable
 $(EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $@
 
