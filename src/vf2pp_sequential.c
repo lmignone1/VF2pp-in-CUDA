@@ -25,7 +25,7 @@ int* findCandidates(Graph*, Graph*, State*, int, int*);
 int intersectionCount(int*, int, int*);
 int* findNodesOfLabel(int*, Graph*, int, int, int*);
 bool cutISO(Graph*, Graph*, State*, int, int);
-int* findNeighbors(Graph*, int, int*);
+int* findNeighbors(Graph*, int);
 bool checkLabels(Graph*, Graph*, int*, int*, int, int, int*);
 
 int main(int argc, char* argv[]) {
@@ -486,8 +486,8 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
 bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     // printf("\nCutISO node1 %d e node2 %d\n", node1, node2);
 
-    int nbrSize1 = 0, nbrSize2 = 0;
-    int* neighbors1 = findNeighbors(g1, node1, &nbrSize1);
+    int nbrSize1 = g1->degrees[node1], nbrSize2 = g2->degrees[node2];
+    int* neighbors1 = findNeighbors(g1, node1);
 
     // printf("Neighbors1 of node1 %d: ", node1);
     // for(int i = 0; i < nbrSize1; i++) {
@@ -495,7 +495,7 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     // }
     // printf("\n");
 
-    int* neighbors2 = findNeighbors(g2, node2, &nbrSize2);
+    int* neighbors2 = findNeighbors(g2, node2);
 
     // printf("Neighbors2 of node2 %d: ", node2);
     // for(int i = 0; i < nbrSize2; i++) {
@@ -620,9 +620,10 @@ bool checkLabels(Graph*g1, Graph*g2, int* neighbors1, int* neighbors2, int nbr1S
     return true;
 }
 
-int* findNeighbors(Graph* g, int node, int* size) {
+int* findNeighbors(Graph* g, int node) {
     int* neighbors = (int*)malloc(g->degrees[node] * sizeof(int));  
-    
+    int size = 0;
+
     if(neighbors == NULL) {
         printf("Error allocating memory in findNeighbors\n");
         exit(EXIT_FAILURE);
@@ -630,8 +631,8 @@ int* findNeighbors(Graph* g, int node, int* size) {
 
     for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
         if (g->matrix[node * g->numVertices + adjVertex] == 1) {
-            neighbors[*size] = adjVertex;
-            *size = *size + 1;
+            neighbors[size] = adjVertex;
+            size++;
         }
     }
     
