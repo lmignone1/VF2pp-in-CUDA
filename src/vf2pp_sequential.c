@@ -446,7 +446,7 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
                 state->mapping1[info->vertex] = candidate;
                 state->mapping2[candidate] = info->vertex;
 
-                if(isMappingFull(g1, state)) {
+                if(matchingNode >= g1->numVertices) {
                     freeStack(stack);
                     free(order);
                     printf("Graphs are isomorphic\n");

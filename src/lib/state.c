@@ -83,15 +83,6 @@ void printState(State* s, int numVertices) {
     }
 }
 
-bool isMappingFull(Graph* g, State* state) {
-    for(int i = 0; i < g->numVertices; i++) {
-        if(state->mapping1[i] == -1) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void updateState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
         

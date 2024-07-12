@@ -21,7 +21,6 @@ typedef struct {
 State* createState(Graph*, Graph*);
 void freeState(State*);
 void printState(State*, int);
-bool isMappingFull(Graph*, State*);
 void updateState(Graph*, Graph*, State*, int, int);
 void restoreState(Graph*, Graph*, State*, int, int);
 
