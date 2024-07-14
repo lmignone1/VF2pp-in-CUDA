@@ -3,7 +3,7 @@ import networkx as nx
 import csv
 import os
 
-NODES = 500
+NODES = 3000
 FILENAME1 = f"graph_query_{NODES}.csv"
 FILENAME2 = f"graph_target_{NODES}.csv"
 LABELS = 10
