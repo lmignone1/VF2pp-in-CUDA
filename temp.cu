@@ -1,4 +1,3 @@
-%%cuda
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -6,14 +5,15 @@
 #include <limits.h>
 #include <string.h>
 
-#define FILENAME_QUERY "data/graph_query_5000.csv"
-#define FILENAME_TARGET "data/graph_target_5000.csv"
+#define FILENAME_QUERY "data/graph_query_10000.csv"
+#define FILENAME_TARGET "data/graph_target_10000.csv"
 #define STREAMS 6
 #define LABELS 10
 #define INF 99999
+#define MAXCONSTMEM 16000
 
 int blockSize;
-__constant__ int constMem[10000];
+__constant__ int constMem[MAXCONSTMEM];
 __constant__ int constMemVar;
 
 #define CUDA_CHECK_ERROR(err)           \
@@ -97,7 +97,7 @@ StackNode* createStack();
 Info* peek(StackNode**);
 
 int main() {
-    blockSize = 128;
+    blockSize = 256;
 
     Graph* h_g1 = readGraph(FILENAME_QUERY);
     Graph* h_g2 = readGraph(FILENAME_TARGET);
@@ -490,7 +490,7 @@ void updateStateGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node, int cand
     updateStateKernel<<<gridSize, blockSize, 0, stream2>>>(d_g2->matrix, d_g2->numVertices, d_state->mapping2, d_state->T2, d_state->T2_out, candidate, node);
 }
 
-__global__ void restoreStateKernel(int* matrix, int V, int node, int* T, int* T_out, int offset) {  // offset introduced because of the two streams
+__global__ void restoreStateKernel(int* matrix, int V, int node, int* T, int* T_out, int offset, int usage, int* mapping) {  // offset introduced because of the two streams
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (idx >= V) {
@@ -501,23 +501,48 @@ __global__ void restoreStateKernel(int* matrix, int V, int node, int* T, int* T_
 
     if(matrix[node * V + idx] == 1) {
 
-        if(constMem[offset + idx] != -1) {  // constMem contains mapping1 if offset is 0, mapping2 if offset is V
-            atomicExch(&T[node], 1);
-            isAdded = 1;
-        }
-        else {
-            int hasCoveredNeighbor = 0;
-            for(int adjVertex2 = 0; adjVertex2 < V; adjVertex2++) {
-                if(matrix[idx * V + adjVertex2] == 1 && constMem[offset + adjVertex2] != -1) {   // constMem contains mapping1 if offset is 0, mapping2 if offset is V
-                    hasCoveredNeighbor = 1;
-                    break;
+        if(usage == 1) {
+
+            if(constMem[offset + idx] != -1) {  // constMem contains mapping1 if offset is 0, mapping2 if offset is V
+                atomicExch(&T[node], 1);
+                isAdded = 1;
+            }
+            else {
+                int hasCoveredNeighbor = 0;
+                for(int adjVertex2 = 0; adjVertex2 < V; adjVertex2++) {
+                    if(matrix[idx * V + adjVertex2] == 1 && constMem[offset + adjVertex2] != -1) {   // constMem contains mapping1 if offset is 0, mapping2 if offset is V
+                        hasCoveredNeighbor = 1;
+                        break;
+                    }
+                }
+
+                if(hasCoveredNeighbor == 0) {
+                    T[idx] = -1;
+                    T_out[idx] = 1;
                 }
             }
 
-            if(hasCoveredNeighbor == 0) {
-                T[idx] = -1;
-                T_out[idx] = 1;
+        } else {
+
+            if(mapping[idx] != -1) { 
+                atomicExch(&T[node], 1);
+                isAdded = 1;
             }
+            else {
+                int hasCoveredNeighbor = 0;
+                for(int adjVertex2 = 0; adjVertex2 < V; adjVertex2++) {
+                    if(matrix[idx * V + adjVertex2] == 1 && mapping[adjVertex2] != -1) {   
+                        hasCoveredNeighbor = 1;
+                        break;
+                    }
+                }
+
+                if(hasCoveredNeighbor == 0) {
+                    T[idx] = -1;
+                    T_out[idx] = 1;
+                }
+            }
+
         }
     }
 
@@ -534,17 +559,21 @@ void restoreStateGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node, int can
     size_t size2 = d_g2->numVertices * sizeof(int);
     int value = -1;
 
+    int useConstMem = d_g1->numVertices + d_g2->numVertices < MAXCONSTMEM;
+
     CUDA_CHECK_ERROR(cudaMemcpyAsync(d_state->mapping1 + node, &value, sizeof(int), cudaMemcpyHostToDevice, stream1));
     CUDA_CHECK_ERROR(cudaMemcpyAsync(d_state->mapping2 + candidate, &value, sizeof(int), cudaMemcpyHostToDevice, stream2));
 
-    CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_state->mapping1, size1, 0, cudaMemcpyDeviceToDevice, stream1));
-    CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_state->mapping2, size2, size1, cudaMemcpyDeviceToDevice, stream2));
-
+    if(useConstMem) {
+        CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_state->mapping1, size1, 0, cudaMemcpyDeviceToDevice, stream1));
+        CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_state->mapping2, size2, size1, cudaMemcpyDeviceToDevice, stream2));
+    }
+    
     int gridSize = (d_g1->numVertices + blockSize - 1) / blockSize;
-    restoreStateKernel<<<gridSize, blockSize, 0, stream1>>>(d_g1->matrix, d_g1->numVertices, node, d_state->T1, d_state->T1_out, 0);
+    restoreStateKernel<<<gridSize, blockSize, 0, stream1>>>(d_g1->matrix, d_g1->numVertices, node, d_state->T1, d_state->T1_out, 0, useConstMem, d_state->mapping1);
     
     gridSize = (d_g2->numVertices + blockSize - 1) / blockSize;
-    restoreStateKernel<<<gridSize, blockSize, 0, stream2>>>(d_g2->matrix, d_g2->numVertices, candidate, d_state->T2, d_state->T2_out, d_g1->numVertices);
+    restoreStateKernel<<<gridSize, blockSize, 0, stream2>>>(d_g2->matrix, d_g2->numVertices, candidate, d_state->T2, d_state->T2_out, d_g1->numVertices, useConstMem, d_state->mapping2);
 
     cudaStreamSynchronize(stream1);
     cudaStreamSynchronize(stream2);
@@ -784,10 +813,6 @@ __global__ void findLevelNodesKernel(int* levels, int depth, int* levelNodes, in
     if(threadIdx.x == 0) {
         atomicAdd(levelSize, s_levelSize);
     }
-}
-
-__global__ void updateArrayKernel(int* array, int* index, int value) {
-    array[*index] = value;
 }
 
 __global__ void initBfsKernel(int* levels, int V, int* root, int depth) {
@@ -1122,7 +1147,7 @@ __global__ void findCoveredNeighborsKernel(int* matrix1, int* mapping1, int node
 
 __global__ void findCandidatesKernel(int g1_label, int maxSizeCandidates, int* g2_vertexList, int g1_degree, int* g2_degrees, int* T2_out, 
                                     int* mapping2, int* candidates, int* candidateSize, int g2_numVertices, int* commonNodes, int* g2_matrix, 
-                                    int* g2_nodesToLabel, int offset) {
+                                    int* g2_nodesToLabel, int offset, int useConstMem, int* coveredNeighbors, int* mapping1) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1142,12 +1167,26 @@ __global__ void findCandidatesKernel(int g1_label, int maxSizeCandidates, int* g
         if(idx < g2_numVertices) {
            commonNodes[idx] = 1;
 
-            for (int i = 0; i < constMemVar; i++) {
-                int nbrG1 = constMem[i];        // constMem contains coveredNeighbors with offset 0
-                int mappedG2 = constMem[offset + nbrG1]; // constMem contains mapping1 with offset degrees[node]
-                if (g2_matrix[mappedG2 * g2_numVertices + idx] == 0) {
-                    commonNodes[idx] = 0;
+            if(useConstMem) {
+                
+                for (int i = 0; i < constMemVar; i++) {
+                    int nbrG1 = constMem[i];        // constMem contains coveredNeighbors with offset 0
+                    int mappedG2 = constMem[offset + nbrG1]; // constMem contains mapping1 with offset degrees[node]
+                    if (g2_matrix[mappedG2 * g2_numVertices + idx] == 0) {
+                        commonNodes[idx] = 0;
+                    }
                 }
+
+            } else {
+
+                for (int i = 0; i < constMemVar; i++) {
+                    int nbrG1 = coveredNeighbors[i];
+                    int mappedG2 = mapping1[nbrG1];
+                    if (g2_matrix[mappedG2 * g2_numVertices + idx] == 0) {
+                        commonNodes[idx] = 0;
+                    }
+                }
+
             }
 
             if (commonNodes[idx] && mapping2[idx] != -1) {
@@ -1178,9 +1217,13 @@ int* findCandidatesGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node, int* 
     size_t size2 = d_g2->numVertices * sizeof(int);
     size_t size1 = d_g1->numVertices * sizeof(int);
 
-    // writes on constMem must be sequential
-    CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_state->mapping1, size1, neighSize, cudaMemcpyDeviceToDevice, stream2));    // neighSize is the offset
+    int useConstMem = d_g1->numVertices + h_g1->degrees[node] < MAXCONSTMEM;
 
+    // writes on constMem must be sequential
+    if(useConstMem) {
+        CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_state->mapping1, size1, neighSize, cudaMemcpyDeviceToDevice, stream2));    // neighSize is the offset
+    }
+    
     int* d_coveredNeighbors, *d_coveredNeighborsSize;
     
     CUDA_CHECK_ERROR(cudaMalloc((void**)&d_coveredNeighbors, neighSize));
@@ -1208,13 +1251,16 @@ int* findCandidatesGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node, int* 
     gridSize = (d_g2->numVertices + blockSize - 1) / blockSize;
     
     cudaStreamSynchronize(stream2); // transfer of constMem in the stream2 must be finished before the second write on constMem
+
+    if(useConstMem) {
+        CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_coveredNeighbors, neighSize, 0, cudaMemcpyDeviceToDevice, stream1));   // it is queued before the kernel call on stream1 so implicit synchronization
+    }
     
-    CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_coveredNeighbors, neighSize, 0, cudaMemcpyDeviceToDevice, stream1));   // it is queued before the kernel call on stream1 so implicit synchronization
     CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMemVar, d_coveredNeighborsSize, sizeof(int), 0, cudaMemcpyDeviceToDevice, stream1)); // constMemVar contains coveredNeighborsSize
 
     findCandidatesKernel<<<gridSize, blockSize, 0, stream1>>>(g1_label, maxSizeCandidates, d_g2->labelToNodes[g1_label], g1_degree, 
                             d_g2->degrees, d_state->T2_out, d_state->mapping2, d_candidates, d_candidateSize, d_g2->numVertices, 
-                            d_commonNodes, d_g2->matrix, d_g2->nodesToLabel, h_g1->degrees[node]);
+                            d_commonNodes, d_g2->matrix, d_g2->nodesToLabel, h_g1->degrees[node], useConstMem, );
 
     int* candidates = (int*)malloc(maxSizeCandidates * sizeof(int));
     
@@ -1329,7 +1375,7 @@ __global__ void findNeighborsKernel(int* matrix, int node, int* neighbors, int* 
 }
 
 __global__ void checkLabelsKernel(int* neighbors1, int nbrSize1, int nbrSize2, int* labelsNbr, int numVertices,
-    int* g1_nodesToLabel, int* d_result, int offset) {   // idx is the id of the thread in the grid
+    int* g1_nodesToLabel, int* d_result, int offset, int usage, int* neighbors2, int* g2_nodesToLabel) {   // idx is the id of the thread in the grid
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1338,12 +1384,26 @@ __global__ void checkLabelsKernel(int* neighbors1, int nbrSize1, int nbrSize2, i
         int labelNbr1 = g1_nodesToLabel[nbr1];
         bool found = false;
 
-        for(int i = 0; i < nbrSize2; i++) {
-            int nbr2 = constMem[i];     // constMem contains the neighbors2 with offset 0
-            if(labelNbr1 == constMem[offset + nbr2]) {  // constMem contains the g2_nodesToLabel with offset degrees[node]
-                found = true;
-                labelsNbr[labelNbr1] = 1;
-                break;
+        if(usage) {
+
+            for(int i = 0; i < nbrSize2; i++) {
+                int nbr2 = constMem[i];     // constMem contains the neighbors2 with offset 0
+                if(labelNbr1 == constMem[offset + nbr2]) {  // constMem contains the g2_nodesToLabel with offset degrees[node]
+                    found = true;
+                    labelsNbr[labelNbr1] = 1;
+                    break;
+                }
+            }
+
+        } else {
+
+            for(int i = 0; i < *nbrSize2; i++) {
+                int nbr2 = neighbors2[i];
+                if(labelNbr1 == g2_nodesToLabel[nbr2]) {
+                    found = true;
+                    labelsNbr[labelNbr1] = 1;
+                    break;
+                }
             }
         }
 
@@ -1408,7 +1468,11 @@ bool cutISOGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node1, int node2, G
     size_t size2 = d_g2->numVertices * sizeof(int);
     size_t labelSize = LABELS * sizeof(int);
 
-    CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_g2->nodesToLabel, size2, nbrSize2_bytes, cudaMemcpyDeviceToDevice, stream3)); // constMem contains g2_nodesToLabel
+    int useConstMem = d_g2->numVertices + nbrSize2 < MAXCONSTMEM;
+
+    if(useConstMem) {
+        CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_g2->nodesToLabel, size2, nbrSize2_bytes, cudaMemcpyDeviceToDevice, stream3)); // constMem contains g2_nodesToLabel
+    }
 
     int* d_neighbors1, *d_neighbors2;
     int* d_nbrSize1, *d_nbrSize2;
@@ -1445,13 +1509,15 @@ bool cutISOGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node1, int node2, G
 
     cudaStreamSynchronize(stream3); // the first write on constMem must be finished before the second write on constMem
     
-    CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_neighbors2, nbrSize2_bytes, 0, cudaMemcpyDeviceToDevice, stream2)); // constMem contains neighbors2. it is queued after findNeighborsKernel on stream2 
+    if(useConstMem) {
+        CUDA_CHECK_ERROR(cudaMemcpyToSymbolAsync(constMem, d_neighbors2, nbrSize2_bytes, 0, cudaMemcpyDeviceToDevice, stream2)); // constMem contains neighbors2. it is queued after findNeighborsKernel on stream2 
+    }
 
     cudaStreamSynchronize(stream4);
     cudaStreamSynchronize(stream2);
 
     checkLabelsKernel<<<gridSize, blockSize, 0, stream1>>>(d_neighbors1, nbrSize1, nbrSize2, d_labelsNbr, d_g1->numVertices, 
-                        d_g1->nodesToLabel, d_result, nbrSize2);
+                        d_g1->nodesToLabel, d_result, nbrSize2, useConstMem, d_neighbors2, d_g2->nodesToLabel);
 
     int* labelsNbr = (int*)malloc(labelSize);
     CUDA_CHECK_ERROR(cudaMemcpyAsync(&result, d_result, sizeof(int), cudaMemcpyDeviceToHost, stream1));
