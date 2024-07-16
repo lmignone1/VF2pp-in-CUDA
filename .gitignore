@@ -3,3 +3,4 @@
 .tips
 .tmp.driveupload
 .tmp.drivedownload
+*.csv

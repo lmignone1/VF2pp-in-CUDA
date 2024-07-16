@@ -1,3 +1,4 @@
+%%cuda
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -97,7 +98,7 @@ StackNode* createStack();
 Info* peek(StackNode**);
 
 int main() {
-    blockSize = 256;
+    blockSize = 4;
 
     Graph* h_g1 = readGraph(FILENAME_QUERY);
     Graph* h_g2 = readGraph(FILENAME_TARGET);
@@ -675,7 +676,7 @@ __global__ void bfsKernel(int* matrix, int V, int* levels, int* d_done, int dept
 
         for(int adjVertex = 0; adjVertex < V; adjVertex++) {
             if(matrix[idx * V + adjVertex] == 1 && s_levels[adjVertex] == -1) {
-                atomicExch(&levels[adjVertex], depth + 1);
+                levels[adjVertex] = depth + 1;  // depth is a "constant" so no need to use atomicExch
                 s_done = 1;
             }
         }
@@ -683,8 +684,8 @@ __global__ void bfsKernel(int* matrix, int V, int* levels, int* d_done, int dept
 
     __syncthreads();
 
-    if(threadIdx.x == 0) {
-        atomicExch(d_done, s_done);
+    if(threadIdx.x == 0 && s_done) {
+        *d_done = 1;
     }
 }
 
@@ -763,7 +764,7 @@ __global__ void maxDegreeFilterKernel(int V, int* d_degrees, int* d_maxDegree, i
 __global__ void findNodeKernel(int V, int* is_good, int* d_node) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if(idx < V && is_good[idx]) {
-        atomicExch(d_node, idx);
+        atomicExch(d_node, idx);    // we don't know which thread will be the first to find the node but are equivalent
     }
 }
 
@@ -827,17 +828,6 @@ __global__ void initBfsKernel(int* levels, int V, int* root, int depth) {
         }
     }
 }
-
-// __global__ void printArrayKernel(int* arr, int V) {
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//     if( idx == 0)
-//       for(int i = 0; i < V; i++)
-//         printf("%d ", arr[i]);
-// }
-
-// __global__ void printVarKernel(int* d) {
-//     printf(" .%d. ", *d);
-// }
 
 int* orderingGPU(Graph* d_g1, Graph* d_g2, cudaStream_t* streams, Graph* h_g1) {
     // findRootGPU
@@ -1000,7 +990,7 @@ __global__ void updateConnKernel(int* matrix, int V, int* connectivity, int node
 
     if(idx < V) {
         if(matrix[node * V + idx] == 1) {
-            atomicAdd(&connectivity[idx], 1);
+            connectivity[idx]++;
         }
     }
 }
@@ -1260,7 +1250,7 @@ int* findCandidatesGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node, int* 
 
     findCandidatesKernel<<<gridSize, blockSize, 0, stream1>>>(g1_label, maxSizeCandidates, d_g2->labelToNodes[g1_label], g1_degree, 
                             d_g2->degrees, d_state->T2_out, d_state->mapping2, d_candidates, d_candidateSize, d_g2->numVertices, 
-                            d_commonNodes, d_g2->matrix, d_g2->nodesToLabel, h_g1->degrees[node], useConstMem, );
+                            d_commonNodes, d_g2->matrix, d_g2->nodesToLabel, h_g1->degrees[node], useConstMem, d_coveredNeighbors, d_state->mapping1);
 
     int* candidates = (int*)malloc(maxSizeCandidates * sizeof(int));
     
@@ -1397,7 +1387,7 @@ __global__ void checkLabelsKernel(int* neighbors1, int nbrSize1, int nbrSize2, i
 
         } else {
 
-            for(int i = 0; i < *nbrSize2; i++) {
+            for(int i = 0; i < nbrSize2; i++) {
                 int nbr2 = neighbors2[i];
                 if(labelNbr1 == g2_nodesToLabel[nbr2]) {
                     found = true;
@@ -1408,7 +1398,7 @@ __global__ void checkLabelsKernel(int* neighbors1, int nbrSize1, int nbrSize2, i
         }
 
         if(!found) {
-            atomicExch(d_result, 0);   // d_result is initialized to 1 by default
+            *d_result = 0;   // d_result is initialized to 1 by default
         }
     }
 }
