@@ -1,0 +1,92 @@
+per la compilazione:
+
+gcc -c mialibreria.c -o mialibreria.o
+ar rcs libmialibreria.a mialibreria.o
+
+gcc main.c -L. -lmialibreria -o main
+
+normalmente gcc main.c -o main
+
+./main
+ ------ 
+
+idee primo colloqio prof 
+
+dataset casuale va bene
+nelle analisi puoi usare grafi di dimensioni diverse e con vincoli di grado diversi. 
+analisi in cui usiamo numero di blocchi diversi
+usa nvprof per le analisi 
+
+esistono modi di fare ordinamento e bfs gia implmentati in cuda, quindi devi scegliere quale usare
+
+per l ordinamento potresti pensare ad un heap dato che poi hai una bfs
+essendo che devi usare una bfs di fatto sei in un albero binario quindi tienine conto 
+
+non ha dato vincoli legati alle dimensioni del grafo ma sappiamo che l efficienza di evidenzia al crescere della dimensione
+vito ha notato che le matrici sono migliori quando la dimensione del grafo cresce 
+
+
+usare benchmark e tutti gli altri cazzi durante l analisi
+del vf2 te ne puoi fottere -> dopo alcune allusioni al codice ha proposto di fare il confronto ma è opzionale 
+il confronto va fatto tra cuda e sequenziale in c sullo stesso grafo. quindi meglio realizzare il grafo in python usando lo stesso generatore di quello in python. 
+Inoltre usando questi grafi, puoi usare direttamente il benchmark del cristiano per confrontare vf2 e vf2++. (opzionale)
+
+	DEVI PARTIRE DAL SEQUENZIALE
+
+--- liste di adiacenza gpt (SEQUENZIALE)
+Raccomandazione per VF2++
+Dato che lavorerai su grafi di grandi dimensioni, ti consiglio di utilizzare liste di adiacenza. Questo è dovuto principalmente 
+alla loro efficienza in termini di memoria e alla loro adattabilità ai grafi sparsi, che sono comuni nei casi reali.
+
+
+--- eliminiamo liste di adj perche in cuda è + semplice con matrix a discapito della memoria (CUDA). 
+Giustificazione da usare è che al crescere delle dimensioni di un grafo, avere una matrice anzicche una lista è + efficente sebbene comporti un aumento della complessita computazionale che andremo a gestire attraverso cuda
+
+
+
+PROFILAZIONE SEQUENZIALE (meglio usarlo in main completo (parallel stream), ultimo commit (push and info divided))
+gcc main.c -o main -pg
+./main 
+gprof main gmon.out > analysis_seq_5000.txt && rm gmon.out
+
+
+
+
+nvprof dovrebbe fornire il numero di floating point operation 
+
+ricorda che cpxSequential ha contenuto diverso rispetto al main di sequential
+non c e adjcreate matric, removeElementArray, c è un ciclo while in piu inutile in ordering
+
+in ordering il ciclo while + esterno è inutile in quanto avendo il ciclo for che itera sulla depth e processa i suoi nodi (processDepth), fara si che ciascuno sara sempre ordinato dato che c e un while in process ("finche l intero livello non è stato ordinato"). (audio while hpc)
+
+
+
+
+
+
+DELUCIDAZIONE DELLA DIFFERENZA DI ORDER OTTENUTA TRA SEQUENZIALE E PARALLELA
+Da un attenta analisi di debug risultano in output due order diversi se eseguiti in parallelo o sequenziale. Questo accade perchè nel sequenziale, dopo l applicazione dei filtri (vincoli di ricerca maxConnectivity, maxDegree, maxRarity), se abbiamo piu di un vertice che soddisfano questi requisiti (ne coonsegue che la scelta è ambivalente), verra considerato il primo nodo, a causa della natura del ciclo for. Infatti essendo che alla fine abbiamo un controllo sulla maxRarity, il primo vertice che soddisfa la condizione viene salvato, in tal caso è il nodo 5. Quando arriva il nodo 6, avendo la stessa rarity di maxRarity non entra pertanto verra scartato. 
+
+Nel caso parallelo invece, verra salvato il nodo il cui thread effettua per ultimo l'atomicExch. In tal caso, il nodo 6 effettua per ultimo lo scambio pertanto il 5 verra scartato. Questo spiega il cambio di nodo. 
+
+Dunque, il nodo 5 e 6 sono uguali ma non cambiano il risultato dell'algoritmo.
+
+Output sequenziale:	1 9 2 8 4 5 3 6 0 7
+output parallelo: 	1 9 2 8 4 6 3 5 0 7
+
+per il momento l unica modifica tra push e non in vf2pp è il commento //cudaFree da qualche parte che è un refuso
+
+
+
+gcc -c src/lib/stack.c -o src/lib/stack.o
+gcc -c src/lib/queue.c -o src/lib/queue.o
+gcc -c src/lib/graph.c -o src/lib/graph.o
+gcc -c src/lib/state.c -o src/lib/state.o
+gcc -c src/sequential/main.c -o src/sequential/main.o
+gcc src/sequential/main.o src/lib/stack.o src/lib/queue.o src/lib/graph.o src/lib/state.o -o src/sequential/mainù
+
+
+!nvcc -Xptxas="-v" -o vf2_paralell temp.cu
+
+
+
