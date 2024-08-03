@@ -2,14 +2,15 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 
 #include "lib/stack.h"
 #include "lib/queue.h"
 #include "lib/graph.h"
 #include "lib/state.h"
 
-#define PATH_QUERY "data/graph_query_%d.csv"
-#define PATH_TARGET "data/graph_target_%d.csv"
+#define PATH_QUERY "data/graph_query_%d_%d.csv"
+#define PATH_TARGET "data/graph_target_%d_%d.csv"
 #define INF 99999
 
 void vf2pp(Graph*, Graph*, State*);
@@ -27,6 +28,7 @@ int* findNodesOfLabel(int*, Graph*, int, int, int*);
 bool cutISO(Graph*, Graph*, State*, int, int);
 int* findNeighbors(Graph*, int);
 bool checkLabels(Graph*, Graph*, int*, int*, int, int, int*);
+void saveTime(char*, float);
 
 int main(int argc, char* argv[]) {
     int V = atoi(argv[1]); // number of vertices
@@ -34,8 +36,8 @@ int main(int argc, char* argv[]) {
     
     char path1[256];
     char path2[256];
-    sprintf(path1, PATH_QUERY, V);
-    sprintf(path2, PATH_TARGET, V);
+    sprintf(path1, PATH_QUERY, V, D);
+    sprintf(path2, PATH_TARGET, V, D);
 
     Graph* g1 = readGraph(path1);
     Graph* g2 = readGraph(path2);
@@ -45,7 +47,17 @@ int main(int argc, char* argv[]) {
     // printState(s, g1->numVertices);
     // printf("\n");
     
+    clock_t start, end;
+    start = clock();
+
     vf2pp(g1, g2, s);
+
+    end = clock();
+
+    double time = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    sprintf(path1, "result_%d_%d.txt", V, D);
+    saveTime(path1, time);
     
     printf("Mapping\n");
     for(int i = 0; i < g1->numVertices; i++) {
@@ -57,6 +69,26 @@ int main(int argc, char* argv[]) {
     freeState(s);
 
     return EXIT_SUCCESS;
+}
+
+void saveTime(char* filename, float time) {
+    char path[256];
+    char folder[] = "benchmark/measures/sequential/";
+
+    char mkdir_command[256];
+    sprintf(mkdir_command, "mkdir -p %s", folder);
+    system(mkdir_command);
+
+    sprintf(path, "%s%s", folder, filename);
+
+    FILE* file = fopen(path, "a");
+    if (file == NULL) {
+        printf("Error opening output file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(file, "%f ", time);
+    fclose(file);
 }
 
 bool checkGraphProperties(Graph* g1, Graph* g2) {

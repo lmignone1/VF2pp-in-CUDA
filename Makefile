@@ -28,6 +28,6 @@ $(SRC_DIR)/$(EXEC).o: $(SRC_DIR)/$(EXEC).c
 $(EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $@
 
-# Pulizia
+# Cleaning
 clean:
 	rm -f $(OBJS) $(EXEC)
