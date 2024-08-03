@@ -5,6 +5,10 @@
 #include <limits.h>
 #include <string.h>
 
+#include "lib/stack.h"
+#include "lib/graph.h"
+#include "lib/state.h"
+
 #define PATH_QUERY "data/graph_query_%d_%d.csv"
 #define PATH_TARGET "data/graph_target_%d_%d.csv"
 #define STREAMS 6
@@ -23,53 +27,14 @@ __constant__ int constMemVar;
         exit(EXIT_FAILURE);              \
     }
 
-/***** STRUCTS *****/
-typedef struct {
-    int* matrix;
-    int numVertices;
-    int* nodesToLabel;
-    int** labelToNodes;
-    int* labelsCardinalities;
-    int* degrees;
-} Graph;
-
-typedef struct {
-    int *mapping1;  // mapping from query to target
-    int *mapping2;  // mapping from target to query
-    int *T1;        // Ti contains uncovered neighbors of covered nodes from Gi, i.e. nodes that are not in the mapping, but are neighbors of nodes that are.
-    int *T2;
-    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti. Cioe nodi che non sono in mapping e non sono vicini di nodi coperti
-    int* T2_out;
-} State;
-
-typedef struct {
-    int vertex;
-    int* candidates;
-    int sizeCandidates;
-    int candidateIndex;
-} Info;
-
-typedef struct StackNode {
-    Info* info;
-    struct StackNode* next;
-} StackNode;
-
 /***** GRAPH PROTOTYPES *****/
 void initGraphGPU(Graph*);
-Graph* createGraph();
-void addEdge(Graph*, int, int);
-Graph* readGraph(char*);
-void printGraph(Graph*);
-void freeGraph(Graph*);
-void setLabel(Graph*, int, int);
-
 Graph* graphGPU(Graph*);
 void freeGraphGPU(Graph*);
 
 /***** STATE PROTOTYPES *****/
 State* createStateGPU(Graph*, Graph*, cudaStream_t*);
 void freeStateGPU(State*);
-void printState(State*, int);
 void updateStateGPU(Graph*, Graph*, State*, int, int, cudaStream_t*);
 void restoreStateGPU(Graph*, Graph*, State*, int, int, cudaStream_t*);
 
@@ -82,19 +47,6 @@ void findRootGPU(Graph*, int*, int*, int*, int*, cudaStream_t*);
 void processDepthGPU(Graph*, int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, cudaStream_t*, Graph*);
 int* findCandidatesGPU(Graph*, Graph*, State*, int, int*, Graph*, Graph*, cudaStream_t*);
 bool cutISOGPU(Graph*, Graph*, State*, int, int, Graph*, Graph*, cudaStream_t*);
-
-/***** STACK PROTOTYPES *****/
-Info* createInfo(int* candidates, int sizeCandidates, int vertex);
-StackNode* createStackNode(Info*);
-void push(StackNode**, Info*);
-Info* pop(StackNode**);
-bool isStackEmpty(StackNode*);
-void freeStack(StackNode*);
-void printStack(StackNode*);
-void printInfo(Info*);
-void freeInfo(Info*);
-StackNode* createStack();
-Info* peek(StackNode**);
 
 void saveTime(char*, float);
 
@@ -262,105 +214,6 @@ void initGraphGPU(Graph* g) {
     cudaFree(d_matrix);
 }
 
-void setLabel(Graph* g, int node, int label) {
-    if (g->nodesToLabel[node] == -1) {
-        g->nodesToLabel[node] = label;
-        g->labelsCardinalities[label]++;
-        g->labelToNodes[label][g->labelsCardinalities[label] - 1] = node;
-    }
-}
-
-void addEdge(Graph* g, int src, int target) {
-    g->matrix[src * g->numVertices + target] = 1;
-    g->matrix[target * g->numVertices + src] = 1;
-    g->degrees[src]++;
-    g->degrees[target]++;
-}
-
-Graph* createGraph() {
-    Graph* g = (Graph*)malloc(sizeof(Graph));
-
-    if (g == NULL) {
-        printf("Error allocating memory in createGraph\n");
-        exit(EXIT_FAILURE);
-    }
-
-    g->matrix = NULL;
-    g->numVertices = 0;
-    g->nodesToLabel = NULL;
-    g->labelsCardinalities = NULL;
-    g->degrees = NULL;
-    g->labelToNodes = NULL;
-    return g;
-}
-
-Graph* readGraph(char* path) {
-    int src, target, srcLabel, targetLabel;
-    Graph* g = createGraph();
-
-    FILE* f = fopen(path, "r");
-    if (f == NULL) {
-        printf("Error opening file\n");
-        exit(EXIT_FAILURE);
-    }
-
-    char line[128];
-    fgets(line, sizeof(line), f);
-    sscanf(line, "%*s%*s%*s%d", &g->numVertices);
-    fgets(line, sizeof(line), f); // skip the header
-
-    initGraphGPU(g);
-
-    while (fgets(line, sizeof(line), f)) {
-        sscanf(line, "%d,%d,%d,%d", &src, &target, &srcLabel, &targetLabel);
-        addEdge(g, src, target);
-        setLabel(g, src, srcLabel);
-        setLabel(g, target, targetLabel);
-    }
-
-    fclose(f);
-
-    for(int label = 0; label < LABELS; label++) {
-        g->labelToNodes[label] = (int*)realloc(g->labelToNodes[label], g->labelsCardinalities[label] * sizeof(int));
-    }
-
-    return g;
-}
-
-void printGraph(Graph* g) {
-    for (int i = 0; i < g->numVertices; i++) {
-        for (int j = 0; j < g->numVertices; j++) {
-            printf("%d ", g->matrix[i * g->numVertices + j]);
-        }
-        printf("\tVertex %d, label %d, degree %d\n", i, g->nodesToLabel[i], g->degrees[i]);
-    }
-
-    printf("\nCardinalities\n");
-    for (int i = 0; i < LABELS; i++) {
-        printf("Label %d: %d\n", i, g->labelsCardinalities[i]);
-    }
-
-    for(int i = 0; i < LABELS; i++) {
-       printf("\nLabel %d\n", i);
-       for(int j = 0; j < g->labelsCardinalities[i]; j++) {
-           printf("%d ", g->labelToNodes[i][j]);
-       }
-    }
-}
-
-void freeGraph(Graph* g) {
-    for(int i = 0; i < LABELS; i++) {
-        free(g->labelToNodes[i]);
-    }
-    free(g->labelToNodes);
-    free(g->matrix);
-    free(g->nodesToLabel);
-    free(g->labelsCardinalities);
-    free(g->degrees);
-    free(g);
-    g = NULL;
-}
-
 Graph* graphGPU(Graph* h_g) {
     Graph* d_g = createGraph();
 
@@ -455,50 +308,6 @@ void freeStateGPU(State* s) {
     cudaFree(s->T2_out);
     free(s);
     s = NULL;
-}
-
-void printState(State* s, int numVertices) {
-    printf("Mapping 1\n");
-    for (int i = 0; i < numVertices; i++) {
-        printf("%d ", s->mapping1[i]);
-    }
-
-    printf("\nMapping 2\n");
-    for (int i = 0; i < numVertices; i++) {
-        printf("%d ", s->mapping2[i]);
-    }
-
-    printf("\nT1\n");
-    for (int i = 0; i < numVertices; i++) {
-        if(s->T1[i] != -1) {
-            printf("%d ", i);
-        }
-        // printf("%d ", s->T1[i]);
-    }
-
-    printf("\nT2\n");
-    for (int i = 0; i < numVertices; i++) {
-        if(s->T2[i] != -1) {
-            printf("%d ", i);
-        }
-        // printf("%d ", s->T2[i]);
-    }
-
-    printf("\nT1_out\n");
-    for (int i = 0; i < numVertices; i++) {
-        if(s->T1_out[i] != -1) {
-            printf("%d ", i);
-        }
-        // printf("%d ", s->T1_out[i]);
-    }
-
-    printf("\nT2_out\n");
-    for (int i = 0; i < numVertices; i++) {
-        if(s->T2_out[i] != -1) {
-            printf("%d ", i);
-        }
-        // printf("%d ", s->T2_out[i]);
-    }
 }
 
 __global__ void updateStateKernel(int* matrix, int V, int* mapping, int* T, int* T_out, int node1, int node2) {
@@ -1362,7 +1171,7 @@ void vf2ppGPU(Graph* d_g1, Graph* d_g2, State* d_state, Graph* h_g1, Graph* h_g2
                 if(matchingNode >= d_g1->numVertices) {
                     freeStack(stack);
                     free(order);
-                    printf("Graphs are isomorphic\n");
+                    // printf("Graphs are isomorphic\n");
                     cudaStreamSynchronize(streams[0]);  // wait for updates on the state
                     cudaStreamSynchronize(streams[1]);
                     return;
@@ -1672,91 +1481,4 @@ bool cutISOGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node1, int node2, G
     cudaFree(d_size_g2);
 
     return ret;
-}
-
-/***** STACK FUNCTIONS *****/
-Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
-    Info* info = (Info*)malloc(sizeof(Info));
-    if (info == NULL) {
-        printf("Error allocating memory in createInfo\n");
-        exit(EXIT_FAILURE);
-    }
-    info->vertex = vertex;
-    info->candidates = (int*)realloc(candidates, sizeCandidates * sizeof(int));
-    info->sizeCandidates = sizeCandidates;
-    info->candidateIndex = 0;
-    return info;
-}
-
-StackNode* createStackNode(Info* info) {
-    StackNode* node = (StackNode*)malloc(sizeof(StackNode));
-    if (node == NULL) {
-        printf("Error allocating memory in createStackNode\n");
-        exit(EXIT_FAILURE);
-    }
-    node->info = info;
-    node->next = NULL;
-    return node;
-}
-
-void push(StackNode** top, Info* info) {
-    StackNode* node = createStackNode(info);
-    node->next = *top;
-    *top = node;
-}
-
-Info* pop(StackNode** top) {
-    if (isStackEmpty(*top)) {
-        printf("Stack is empty, cannot pop\n");
-        return NULL;
-    }
-    StackNode* node = *top;
-    Info* info = node->info;
-    *top = node->next;
-    free(node);
-    return info;
-}
-
-bool isStackEmpty(StackNode* top) {
-    return top == NULL;
-}
-
-void freeStack(StackNode* top) {
-    while (!isStackEmpty(top)) {
-        StackNode* node = top;
-        top = top->next;
-        freeInfo(node->info);
-        free(node);
-    }
-}
-
-void printStack(StackNode* top) {
-    StackNode* current = top;
-    while (current != NULL) {
-        printInfo(current->info);
-        current = current->next;
-    }
-}
-
-void printInfo(Info* info) {
-    printf("\nVertex: %d\n", info->vertex);
-    printf("Index seen: %d\n", info->candidateIndex);
-    printf("Candidates: ");
-    for (int i = 0; i < info->sizeCandidates; i++) {
-        printf("%d ", info->candidates[i]);
-    }
-    printf("\n");
-}
-
-void freeInfo(Info* info) {
-    free(info->candidates);
-    free(info);
-}
-
-StackNode* createStack() {
-    return NULL;
-}
-
-Info* peek(StackNode** top) {
-    return (*top)->info;
 }

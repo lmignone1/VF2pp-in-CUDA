@@ -2,10 +2,10 @@
 
 Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
     Info* info = (Info*)malloc(sizeof(Info));
-    if (info == NULL) {
-        printf("Error allocating memory in createInfo\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (info == NULL) {
+    //     printf("Error allocating memory in createInfo\n");
+    //     exit(EXIT_FAILURE);
+    // }
     info->vertex = vertex;
     info->candidates = (int*)realloc(candidates, sizeCandidates * sizeof(int));
     info->sizeCandidates = sizeCandidates;
@@ -15,10 +15,10 @@ Info* createInfo(int* candidates, int sizeCandidates, int vertex) {
 
 StackNode* createStackNode(Info* info) {
     StackNode* node = (StackNode*)malloc(sizeof(StackNode));
-    if (node == NULL) {
-        printf("Error allocating memory in createStackNode\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (node == NULL) {
+    //     printf("Error allocating memory in createStackNode\n");
+    //     exit(EXIT_FAILURE);
+    // }
     node->info = info;
     node->next = NULL;
     return node;
@@ -31,10 +31,10 @@ void push(StackNode** top, Info* info) {
 }
 
 Info* pop(StackNode** top) {
-    if (isStackEmpty(*top)) {
-        printf("Stack is empty, cannot pop\n");
-        return NULL;
-    }
+    // if (isStackEmpty(*top)) {
+    //     printf("Stack is empty, cannot pop\n");
+    //     return NULL;
+    // }
     StackNode* node = *top;
     Info* info = node->info;
     *top = node->next;

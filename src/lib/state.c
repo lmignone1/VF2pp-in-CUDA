@@ -10,10 +10,10 @@ State* createState(Graph* g1, Graph* g2) {
     s->T1_out = (int*)malloc(g1->numVertices * sizeof(int));
     s->T2_out = (int*)malloc(g2->numVertices * sizeof(int));
 
-    if (s == NULL || s->mapping1 == NULL || s->mapping2 == NULL || s->T1 == NULL || s->T2 == NULL || s->T1_out == NULL || s->T2_out == NULL) {
-        printf("Error allocating memory in createState\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (s == NULL || s->mapping1 == NULL || s->mapping2 == NULL || s->T1 == NULL || s->T2 == NULL || s->T1_out == NULL || s->T2_out == NULL) {
+    //     printf("Error allocating memory in createState\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     for (int i = 0; i < g1->numVertices; i++) {
         s->mapping1[i] = -1;

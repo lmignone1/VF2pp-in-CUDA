@@ -142,10 +142,10 @@ int* ordering(Graph* g1, Graph* g2) {
     int* connectivityG1 = (int*)malloc(g1->numVertices * sizeof(int));   // number of neighbors already ordered
     int* V1Unordered = (int*)malloc(g1->numVertices * sizeof(int));    // V1Unordered[i] = -1 if node has not been ordered yet else 1 
 
-    if (order == NULL || labelRarity == NULL || connectivityG1 == NULL || V1Unordered == NULL) {
-        printf("Error allocating memory in ordering\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (order == NULL || labelRarity == NULL || connectivityG1 == NULL || V1Unordered == NULL) {
+    //     printf("Error allocating memory in ordering\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     memcpy(labelRarity, g1->labelsCardinalities, LABELS * sizeof(int)); 
 
@@ -201,10 +201,10 @@ int findLevelNodes(Graph* g, int* levels, int* levelNodes, int depth) {
 int* bfs(Graph* g, int root, int* maxDepth) {
     int* levels = (int*)malloc(g->numVertices * sizeof(int));
 
-    if (levels == NULL) {
-        printf("Error allocating memory in bfs\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (levels == NULL) {
+    //     printf("Error allocating memory in bfs\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     for(int vertex = 0; vertex < g->numVertices; vertex++) {
         levels[vertex] = -1;
@@ -420,10 +420,10 @@ int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
     int* coveredNeighbors = (int*)malloc(g->degrees[node] * sizeof(int));   
     *size = 0;
 
-    if(coveredNeighbors == NULL) {
-        printf("Error allocating memory in findCoveredNeighbors\n");
-        exit(EXIT_FAILURE);
-    }
+    // if(coveredNeighbors == NULL) {
+    //     printf("Error allocating memory in findCoveredNeighbors\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
         for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
         if (g->matrix[node * g->numVertices + adjVertex] == 1 && state->mapping1[adjVertex] != -1) {
@@ -481,7 +481,7 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
                 if(matchingNode >= g1->numVertices) {
                     freeStack(stack);
                     free(order);
-                    printf("Graphs are isomorphic\n");
+                    // printf("Graphs are isomorphic\n");
                     return;
                 }
 
@@ -537,10 +537,10 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
 
     int* labelsNbr = (int*)malloc(LABELS * sizeof(int));
 
-    if(labelsNbr == NULL) {
-        printf("Error allocating memory in cutISO\n");
-        exit(EXIT_FAILURE);
-    }
+    // if(labelsNbr == NULL) {
+    //     printf("Error allocating memory in cutISO\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     bool result = checkLabels(g1, g2, neighbors1, neighbors2, nbrSize1, nbrSize2, labelsNbr); // check if labels are the same
     
@@ -606,10 +606,10 @@ int intersectionCount(int *arr1, int size1, int *arr2) {
 int* findNodesOfLabel(int* neighbors, Graph* g, int label, int maxSize, int* size) {
     int* nodes = (int*)malloc(maxSize * sizeof(int));
     
-    if (nodes == NULL) {
-        printf("Error allocating memory in findNodeOfLabel\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (nodes == NULL) {
+    //     printf("Error allocating memory in findNodeOfLabel\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     *size = 0;
     for(int i = 0; i < maxSize; i++) {
@@ -656,10 +656,10 @@ int* findNeighbors(Graph* g, int node) {
     int* neighbors = (int*)malloc(g->degrees[node] * sizeof(int));  
     int size = 0;
 
-    if(neighbors == NULL) {
-        printf("Error allocating memory in findNeighbors\n");
-        exit(EXIT_FAILURE);
-    }
+    // if(neighbors == NULL) {
+    //     printf("Error allocating memory in findNeighbors\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     for (int adjVertex = 0; adjVertex < g->numVertices; adjVertex++) {
         if (g->matrix[node * g->numVertices + adjVertex] == 1) {

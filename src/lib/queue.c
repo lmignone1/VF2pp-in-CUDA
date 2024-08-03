@@ -7,10 +7,10 @@ Queue* createQueue(int capacity) {
     q->tail = -1;
     q->capacity = capacity;
 
-    if (q == NULL || q->data == NULL) {
-        printf("Error allocating memory in createQueue\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (q == NULL || q->data == NULL) {
+    //     printf("Error allocating memory in createQueue\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     return q;
 }
@@ -23,10 +23,10 @@ void resizeQueue(Queue* q) {
     q->capacity *= 2;
     q->data = (int*)realloc(q->data, q->capacity * sizeof(int));
 
-    if (q->data == NULL) {
-        printf("Error reallocating memory in resizeQueue\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (q->data == NULL) {
+    //     printf("Error reallocating memory in resizeQueue\n");
+    //     exit(EXIT_FAILURE);
+    // }
 }
 
 void enqueue(Queue* q, int item) {

@@ -75,11 +75,11 @@ class GraphGenerator:
             self._save_graph_to_csv(g2, f"graph_target_{v}_3.csv")
     
 if __name__ == "__main__":
-    generator = GraphGenerator([8000], 10)
+    generator = GraphGenerator([3000, 5000, 8000, 10000], 10)
     generator.generate_random_graph()
-    # generator.generate_sparse_dense_graph(0.2)
-    # generator.generate_sparse_dense_graph(0.7)
-    # generator.generate_complete_graph()
+    generator.generate_sparse_dense_graph(0.2)
+    generator.generate_sparse_dense_graph(0.7)
+    generator.generate_complete_graph()
 
 
         
