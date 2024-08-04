@@ -30,13 +30,13 @@ class GraphGenerator:
                 l2 = graph.nodes[v]['label']
                 writer.writerow([u, v, l1, l2])
 
-    # Generate dense graph if p_dense is near 1 and sparse graph if p_dense is near 0
+    # Generate dense graph if p_dense is near 1 and sparse graph if p_dense is near 0. Density is near p_dense
     def generate_sparse_dense_graph(self, p_dense):
         kind_graph = 0 if p_dense < 0.5 else 1
 
         for v in self._nodes:
-            g1 = nx.erdos_renyi_graph(v, p_dense)
-            g2 = nx.erdos_renyi_graph(v, p_dense)
+            g1 = nx.gnp_random_graph(v, p_dense, 42)
+            g2 = nx.gnp_random_graph(v, p_dense, 42)
 
             for node in g1.nodes():
                 label = random.randint(0, self._labels - 1)
