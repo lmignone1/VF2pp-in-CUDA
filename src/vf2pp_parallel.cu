@@ -53,13 +53,12 @@ void saveTime(char*, float);
 int main(int argc, char* argv[]) {
     int V = atoi(argv[1]); // number of vertices
     int D = atoi(argv[2]);  // degree
+    blockSize = atoi(argv[3]);
     
     char path1[256];
     char path2[256];
     sprintf(path1, PATH_QUERY, V, D);
     sprintf(path2, PATH_TARGET, V, D);
-    
-    blockSize = 256;
 
     Graph* h_g1 = readGraph(path1);
     Graph* h_g2 = readGraph(path2);
