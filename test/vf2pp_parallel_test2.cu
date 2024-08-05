@@ -4,10 +4,11 @@
 #include <cuda_runtime.h>
 #include <limits.h>
 #include <string.h>
+#include <assert.h>
 
-#include "lib/stack.h"
-#include "lib/graph.h"
-#include "lib/state.h"
+#include "../src/lib/stack.h"
+#include "../src/lib/graph.h"
+#include "../src/lib/state.h"
 
 #define PATH_QUERY "data/graph_query_%d_%d.csv"
 #define PATH_TARGET "data/graph_target_%d_%d.csv"
@@ -39,7 +40,7 @@ void updateStateGPU(Graph*, Graph*, State*, int, int, cudaStream_t*);
 void restoreStateGPU(Graph*, Graph*, State*, int, int, cudaStream_t*);
 
 /***** VF2++ PROTOTYPES *****/
-void vf2ppGPU(Graph*, Graph*, State*, Graph*, Graph*, cudaStream_t*);
+void vf2ppGPU(Graph*, Graph*, State*, Graph*, Graph*, cudaStream_t*, int**);
 bool checkGraphPropertiesGPU(Graph*, Graph*, Graph*, Graph*, cudaStream_t*);
 int compare(const void*, const void*);
 int* orderingGPU(Graph*, Graph*, cudaStream_t*, Graph*);
@@ -48,7 +49,8 @@ void processDepthGPU(Graph*, int*, int*, int*, int*, int*, int*, int*, int*, int
 int* findCandidatesGPU(Graph*, Graph*, State*, int, int*, Graph*, Graph*, cudaStream_t*);
 bool cutISOGPU(Graph*, Graph*, State*, int, int, Graph*, Graph*, cudaStream_t*);
 
-void saveTime(char*, float);
+bool testOrdering(int*, int);
+bool testIsoMapping(int*, int*, int, int);
 
 int main(int argc, char* argv[]) {
     int V = atoi(argv[1]); // number of vertices
@@ -78,7 +80,9 @@ int main(int argc, char* argv[]) {
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
 
-    vf2ppGPU(d_g1, d_g2, d_state, h_g1, h_g2, streams);
+    int* order = NULL;
+
+    vf2ppGPU(d_g1, d_g2, d_state, h_g1, h_g2, streams, &order);
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
@@ -88,28 +92,27 @@ int main(int argc, char* argv[]) {
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    sprintf(path1, "result_%d_%d.txt", V, D);
-    saveTime(path1, elapsed);
-
     int* mapping1 = (int*)malloc(d_g1->numVertices * sizeof(int));
+    int* mapping2 = (int*)malloc(d_g2->numVertices * sizeof(int));
 
-    if(mapping1 == NULL) {
+    if(mapping1 == NULL || mapping2 == NULL) {
         printf("Error allocating memory in main\n");
         exit(EXIT_FAILURE);
     }
 
     CUDA_CHECK_ERROR(cudaMemcpy(mapping1, d_state->mapping1, d_g1->numVertices * sizeof(int), cudaMemcpyDeviceToHost));
-
-    printf("Mapping\n");
-    for(int i = 0; i < d_g1->numVertices; i++) {
-        printf("%d -> %d\n", i, mapping1[i]);
-    }
+    CUDA_CHECK_ERROR(cudaMemcpy(mapping2, d_state->mapping2, d_g2->numVertices * sizeof(int), cudaMemcpyDeviceToHost));
 
     for(int i = 0; i < STREAMS; i++) {
         cudaStreamDestroy(streams[i]);
     }
 
+    testOrdering(order, d_g1->numVertices);
+    testIsoMapping(mapping1, mapping2, d_g1->numVertices, d_g2->numVertices);
+
     free(mapping1);
+    free(mapping2);
+    free(order);
     freeGraph(h_g1);
     freeGraph(h_g2);
     freeGraphGPU(d_g1);
@@ -120,24 +123,68 @@ int main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
 }
 
-void saveTime(char* filename, float time) {
-    char path[256];
-    char folder[] = "benchmark/measures/parallel/";
+bool testOrdering(int* order, int size) {
+    int expected1[] = {8, 3, 0, 14, 9, 13, 10, 7, 12, 6, 2, 4, 1, 11, 5};
+    int expected2[] = {8, 3, 0, 14, 9, 13, 10, 7, 12, 6, 2, 4, 11, 1, 5};
 
-    char mkdir_command[256];
-    sprintf(mkdir_command, "mkdir -p %s", folder);
-    system(mkdir_command);
-
-    sprintf(path, "%s%s", folder, filename);
-
-    FILE* file = fopen(path, "a");
-    if (file == NULL) {
-        printf("Error opening output file\n");
-        exit(EXIT_FAILURE);
+    printf("\nOrdering test\n");
+    printf("Expected order 1: ");
+    for(int i = 0; i < sizeof(expected1) / sizeof(expected1[0]); i++) {
+        printf("%d ", expected1[i]);
     }
 
-    fprintf(file, "%f ", time);
-    fclose(file);
+    printf("\nExpected order 2: ");
+    for(int i = 0; i < sizeof(expected2) / sizeof(expected2[0]); i++) {
+        printf("%d ", expected2[i]);
+    }
+    
+    assert(size == sizeof(expected1) / sizeof(expected1[0]) || size == sizeof(expected2) / sizeof(expected2[0]));
+
+    for(int i = 0; i < size; i++) {
+        assert(order[i] == expected1[i] || order[i] == expected2[i]);
+    }
+
+    printf("\nResult order: ");
+    for(int i = 0; i < size; i++) {
+        printf("%d ", order[i]);
+    }
+
+    printf("\nOrdering test passed\n");
+}
+
+bool testIsoMapping(int* mapping1, int* mapping2, int size1, int size2) {
+    int expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+
+    printf("\nIsoMapping test\n");
+    printf("Expected mapping: ");
+    for(int i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
+        printf("%d ", expected[i]);
+    }
+
+    printf("\nExpected reverse mapping: ");
+    for(int i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
+        printf("%d ", expected[i]);
+    }
+
+    assert(size1 == sizeof(expected) / sizeof(expected[0]));
+    assert(size2 == sizeof(expected) / sizeof(expected[0]));
+
+    for(int i = 0; i < size1; i++) {
+        assert(mapping1[i] == expected[i]);
+        assert(mapping2[i] == expected[i]);
+    }
+
+    printf("\nResult mapping: ");
+    for(int i = 0; i < size1; i++) {
+        printf("%d ", mapping1[i]);
+    }
+
+    printf("\nResult reverse mapping: ");
+    for(int i = 0; i < size2; i++) {
+        printf("%d ", mapping2[i]);
+    }
+
+    printf("\nIsoMapping test passed\n");
 }
 
 __global__ void initArrayKernel(int* d_array, int size, int value) {
@@ -1127,12 +1174,13 @@ int* findCandidatesGPU(Graph* d_g1, Graph* d_g2, State* d_state, int node, int* 
 }
 
 
-void vf2ppGPU(Graph* d_g1, Graph* d_g2, State* d_state, Graph* h_g1, Graph* h_g2, cudaStream_t* streams) {
+void vf2ppGPU(Graph* d_g1, Graph* d_g2, State* d_state, Graph* h_g1, Graph* h_g2, cudaStream_t* streams, int** order_test) {
     if (!checkGraphPropertiesGPU(h_g1, h_g2, d_g1, d_g2, streams)) {
         return;
     }
 
     int* order = orderingGPU(d_g1, d_g2, streams, h_g1);
+    *order_test = order;
 
      //printf("Order:\t");
      //for(int i = 0; i < h_g1->numVertices; i++) {
@@ -1170,7 +1218,7 @@ void vf2ppGPU(Graph* d_g1, Graph* d_g2, State* d_state, Graph* h_g1, Graph* h_g2
 
                 if(matchingNode >= d_g1->numVertices) {
                     freeStack(stack);
-                    free(order);
+                    // free(order);
                     // printf("Graphs are isomorphic\n");
                     cudaStreamSynchronize(streams[0]);  // wait for updates on the state
                     cudaStreamSynchronize(streams[1]);
@@ -1203,7 +1251,7 @@ void vf2ppGPU(Graph* d_g1, Graph* d_g2, State* d_state, Graph* h_g1, Graph* h_g2
             }
         }
     }
-    free(order);
+    //free(order);
     freeStack(stack);   
 }
 
