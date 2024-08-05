@@ -2,4 +2,3 @@
 *.o
 .tmp.driveupload
 .tmp.drivedownload
-*.csv
