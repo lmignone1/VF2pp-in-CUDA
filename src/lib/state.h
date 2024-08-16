@@ -14,7 +14,7 @@ typedef struct {
     int *mapping2;  // mapping from target to query
     int *T1;        // Ti contains uncovered neighbors of covered nodes from Gi, i.e. nodes that are not in the mapping, but are neighbors of nodes that are.
     int *T2;        
-    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti. Cioe nodi che non sono in mapping e sono vicini di nodi non coperti
+    int* T1_out;     //Ti_out contains all the nodes from Gi, that are neither in the mapping nor in Ti, i.e. nodes that are not in the mapping and are neighbors of uncovered nodes
     int* T2_out;
 } State;
 

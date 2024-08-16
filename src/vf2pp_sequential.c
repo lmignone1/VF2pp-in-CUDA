@@ -91,6 +91,9 @@ void saveTime(char* filename, float time) {
     fclose(file);
 }
 
+/*
+It checks the properties of the two graphs and verify that they have the same characteristics
+*/
 bool checkGraphProperties(Graph* g1, Graph* g2) {
     if (g1->numVertices != g2->numVertices || g1->numVertices == 0 || g2->numVertices == 0) {
         return false;
@@ -109,6 +112,9 @@ bool checkGraphProperties(Graph* g1, Graph* g2) {
     return true;
 }
 
+/* 
+it checks if the two sequences of degrees are the same
+*/
 bool checkSequenceDegree(int* degree1, int* degree2, int size) {
     int* tmp1 = (int*)malloc(size * sizeof(int));
     int* tmp2 = (int*)malloc(size * sizeof(int));
@@ -136,6 +142,11 @@ int compare(const void* a, const void* b) {
     return (*(int*)a - *(int*)b);
 }
 
+/*
+the purpose of the ordering phase is to compute a list where nodes are arranged in an order that allows for quick pruning of unfeasible states.
+The principle is that nodes with the highest connectivity in graph G1 - meaning those with the largest number of already ordered neighbours 
+- are more challenging to match in graph G2 because they must meet more consistency conditions. A BFS is used to avoid easy but computationally expensive mappings
+*/
 int* ordering(Graph* g1, Graph* g2) {
     int* order = (int*)malloc(g1->numVertices * sizeof(int));   // order of the nodes of g1
     int* labelRarity = (int*)malloc(LABELS * sizeof(int)); 
@@ -187,6 +198,9 @@ int* ordering(Graph* g1, Graph* g2) {
     return order;
 }
 
+/*
+given the bfs result, it returns the nodes of the same level
+*/
 int findLevelNodes(Graph* g, int* levels, int* levelNodes, int depth) {
     int i = 0;
     for(int vertex = 0; vertex < g->numVertices; vertex++) {
@@ -198,6 +212,9 @@ int findLevelNodes(Graph* g, int* levels, int* levelNodes, int depth) {
     return i;
 }
 
+/*
+bfs is used for the ordering phase to compute the levels of the nodes in the graph G1
+*/
 int* bfs(Graph* g, int root, int* maxDepth) {
     int* levels = (int*)malloc(g->numVertices * sizeof(int));
 
@@ -232,6 +249,9 @@ int* bfs(Graph* g, int root, int* maxDepth) {
     return levels;
 }
 
+/*
+process each level of the bfs result as described in the paper
+*/
 void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, int* labelRarity, int* V1Unordered, int* levelNodes, int levelSize) {
     int l = levelSize;
     
@@ -284,6 +304,9 @@ void processDepth(int* order, int* order_index, Graph* g, int* connectivityG1, i
     }
 }
 
+/*
+Given node u of G1, finds the candidates of u in G2 that meet all the feasibility conditions.
+*/
 int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandidates) {  
     int coveredNeighborsSize = 0;
     int *coveredNeighbors = findCoveredNeighbors(g1, state, node, &coveredNeighborsSize);
@@ -416,6 +439,9 @@ int* findCandidates(Graph* g1, Graph* g2, State* state, int node, int* sizeCandi
     return candidates;
 }
 
+/*
+it finds the neighbors of node that are already mapped
+*/
 int* findCoveredNeighbors(Graph* g, State* state, int node, int* size) {
     int* coveredNeighbors = (int*)malloc(g->degrees[node] * sizeof(int));   
     *size = 0;
@@ -515,6 +541,9 @@ void vf2pp(Graph* g1, Graph* g2, State* state) {
     freeStack(stack);
 }
 
+/*
+Given a candidate pair of nodes u and v from G1 and G2 respectively, checks if u and v can be matched by appling the cutting rules
+*/
 bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     // printf("\nCutISO node1 %d e node2 %d\n", node1, node2);
 
@@ -542,7 +571,7 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     //     exit(EXIT_FAILURE);
     // }
 
-    bool result = checkLabels(g1, g2, neighbors1, neighbors2, nbrSize1, nbrSize2, labelsNbr); // check if labels are the same
+    bool result = checkLabels(g1, g2, neighbors1, neighbors2, nbrSize1, nbrSize2, labelsNbr); // check if labels of neighbours are the same
     
     // printf("CheckLabels: %d\n", result);
     // printf("LabelsNbr: ");
@@ -592,6 +621,9 @@ bool cutISO(Graph* g1, Graph* g2, State* state, int node1, int node2){
     return false;
 }
 
+/*
+function used for cutting rules 
+*/
 int intersectionCount(int *arr1, int size1, int *arr2) {
     int count = 0;
     for(int i = 0; i < size1; i++) {
@@ -603,6 +635,9 @@ int intersectionCount(int *arr1, int size1, int *arr2) {
     return count;
 }
 
+/*
+it finds all neighbours which label is the same of that passed as parameter
+*/
 int* findNodesOfLabel(int* neighbors, Graph* g, int label, int maxSize, int* size) {
     int* nodes = (int*)malloc(maxSize * sizeof(int));
     
@@ -623,7 +658,10 @@ int* findNodesOfLabel(int* neighbors, Graph* g, int label, int maxSize, int* siz
     return nodes;
 }
 
-bool checkLabels(Graph*g1, Graph*g2, int* neighbors1, int* neighbors2, int nbr1Size, int nbr2Size, int* labelsNbr) {
+/*
+it checks if the labels of the neighbors of node1 in G1 are the same of the neighbors of node2 in G2
+*/
+bool checkLabels(Graph* g1, Graph* g2, int* neighbors1, int* neighbors2, int nbr1Size, int nbr2Size, int* labelsNbr) {
     for(int i = 0; i < LABELS; i++) {
         labelsNbr[i] = 0;
     }
@@ -652,6 +690,9 @@ bool checkLabels(Graph*g1, Graph*g2, int* neighbors1, int* neighbors2, int nbr1S
     return true;
 }
 
+/*
+it finds the neighbors of a node
+*/
 int* findNeighbors(Graph* g, int node) {
     int* neighbors = (int*)malloc(g->degrees[node] * sizeof(int));  
     int size = 0;

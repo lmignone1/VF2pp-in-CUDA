@@ -83,6 +83,9 @@ void printState(State* s, int numVertices) {
     }
 }
 
+/*
+Updates the Ti/Ti_out when a new node pair u-v is added to the mapping after feasibility checks
+*/
 void updateState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
         
@@ -108,6 +111,11 @@ void updateState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     // printf("\n");
 }
 
+/*
+restore the T/T_out when a new node pair u-v is removed from the mapping. If the node we want to remove from the mapping, has at least one covered neighbor, 
+add it to T else checks if its neighbor has another connection with a covered node. If not, it can be exclude it from T.
+if node is not neither in the mapping nor T, it should belong to T_out
+*/
 void restoreState(Graph* g1, Graph* g2, State* state, int node, int candidate) {
     bool isAdded = false;
     for(int adjVertex = 0; adjVertex < g1->numVertices; adjVertex++) {
