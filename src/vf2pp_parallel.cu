@@ -140,6 +140,7 @@ void saveTime(char* filename, float time) {
     fclose(file);
 }
 
+/***** GRAPH FUNCTIONS *****/
 __global__ void initArrayKernel(int* d_array, int size, int value) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < size) {
@@ -156,7 +157,6 @@ __global__ void initMatrixKernel(int* d_matrix, int V, int value) {
     }
 }
 
-/***** GRAPH FUNCTIONS *****/
 void initGraphGPU(Graph* g) {
     g->matrix = (int*)malloc(g->numVertices * g->numVertices * sizeof(int));
     g->nodesToLabel = (int*)malloc(g->numVertices * sizeof(int));
