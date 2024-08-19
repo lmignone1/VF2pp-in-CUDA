@@ -1,8 +1,3 @@
-import random
-import networkx as nx
-import csv
-import os
-
 # MIGNONE LORENZO 0622701866 L.MIGNONE@STUDENTI.UNISA.IT
 # Course: High Performance Computing 2022/2023
 # Lecturer: Francesco Moscato	fmoscato@unisa.it
@@ -23,6 +18,11 @@ import os
 
 # You should have received a copy of the GNU General Public License
 # along with VF2pp-in-CUDA.  If not, see <http://www.gnu.org/licenses/>.
+
+import random
+import networkx as nx
+import csv
+import os
 
 class GraphGenerator:
     '''
